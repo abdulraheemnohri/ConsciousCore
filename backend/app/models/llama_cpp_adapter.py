@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 from pathlib import Path
 from .base import LocalModel
 
@@ -23,12 +24,15 @@ class LlamaCppModel(LocalModel):
         self._llm = Llama(model_path=str(self.model_path), **self.kwargs)
         return self._llm
 
-    async def generate(self, prompt: str, context: list[str] | None = None) -> str:
+    def _generate_sync(self, full_prompt: str) -> str:
         llm = self._load()
-        memories = "\n".join(f"- {x}" for x in (context or []))
-        full_prompt = f"Relevant memory:\n{memories}\n\nUser:\n{prompt}" if memories else prompt
         result = llm(full_prompt, max_tokens=512, temperature=0.2)
         return result["choices"][0]["text"].strip()
+
+    async def generate(self, prompt: str, context: list[str] | None = None) -> str:
+        memories = "\n".join(f"- {x}" for x in (context or []))
+        full_prompt = f"Relevant memory:\n{memories}\n\nUser:\n{prompt}" if memories else prompt
+        return await asyncio.to_thread(self._generate_sync, full_prompt)
 
     def info(self):
         return {**super().info(), "model_path": str(self.model_path), "loaded": self._llm is not None}
