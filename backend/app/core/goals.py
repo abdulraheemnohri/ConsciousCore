@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
+from ..database import db
 
 @dataclass
 class Goal:
@@ -12,16 +13,24 @@ class Goal:
     created_at: str = ""
 
 class GoalManager:
-    def __init__(self): self.items: list[Goal] = []; self.next_id = 1
     def add(self, title: str, priority: float = .5):
-        g = Goal(self.next_id, title, priority, "active", 0.0, datetime.now(timezone.utc).isoformat())
-        self.next_id += 1; self.items.append(g); return g
+        now = datetime.now(timezone.utc).isoformat()
+        cur = db.execute("INSERT INTO goals(title,priority,status,progress,created_at) VALUES(?,?,?,?,?)", (title, priority, "active", 0.0, now))
+        return Goal(**db.fetchone("SELECT * FROM goals WHERE id=?", (cur.lastrowid,)))
+
     def update(self, goal_id: int, progress: float | None = None, status: str | None = None):
-        g = next((x for x in self.items if x.id == goal_id), None)
-        if not g: return None
-        if progress is not None: g.progress = max(0, min(1, progress))
-        if status is not None: g.status = status
-        if g.progress >= 1: g.status = "completed"
-        return g
-    def active(self): return [asdict(g) for g in sorted(self.items, key=lambda x: x.priority, reverse=True) if x.status == "active"]
-    def snapshot(self): return [asdict(g) for g in self.items]
+        goal = db.fetchone("SELECT * FROM goals WHERE id=?", (goal_id,))
+        if not goal:
+            return None
+        new_progress = max(0, min(1, progress)) if progress is not None else goal["progress"]
+        new_status = status or goal["status"]
+        if new_progress >= 1:
+            new_status = "completed"
+        db.execute("UPDATE goals SET progress=?, status=? WHERE id=?", (new_progress, new_status, goal_id))
+        return Goal(**db.fetchone("SELECT * FROM goals WHERE id=?", (goal_id,)))
+
+    def snapshot(self):
+        return [dict(row) for row in db.fetchall("SELECT * FROM goals ORDER BY id")]
+
+    def active(self):
+        return [dict(row) for row in db.fetchall("SELECT * FROM goals WHERE status='active' ORDER BY priority DESC, id")]
