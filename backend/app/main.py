@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from .core.engine import CognitiveEngine
 
-app = FastAPI(title="ConsciousCore", version="1.3.0")
+app = FastAPI(title="ConsciousCore", version="1.4.0")
 origins = [x.strip() for x in os.getenv("CONSCIOUSCORE_CORS", "http://127.0.0.1:5173,http://localhost:5173").split(",") if x.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["*"], allow_headers=["*"])
 engine = CognitiveEngine()
@@ -19,9 +19,11 @@ class Goal(BaseModel): title: str = Field(min_length=1, max_length=500); priorit
 class PlanRequest(BaseModel): goal: str = Field(min_length=1, max_length=1000); constraints: list[str] = []
 class EntityInput(BaseModel): id: str; label: str; kind: str = "concept"
 class RelationInput(BaseModel): source: str; relation: str; target: str; confidence: float = Field(default=.5, ge=0, le=1)
+class ToolInput(BaseModel): name: str; description: str; risk: float = Field(default=.5, ge=0, le=1)
+class ActionCheck(BaseModel): action: str; risk: float = Field(default=.5, ge=0, le=1)
 
 @app.get("/health")
-async def health(): return {"ok": True, "service": "ConsciousCore", "version": "1.3.0"}
+async def health(): return {"ok": True, "service": "ConsciousCore", "version": "1.4.0"}
 @app.get("/api/state")
 async def state(): return engine.snapshot()
 @app.post("/api/chat")
@@ -33,7 +35,7 @@ async def memories(q: str = "", limit: int = 20):
 @app.post("/api/memory")
 async def add_memory(body: MemoryInput): return engine.memory.add(body.content, body.kind, body.importance, body.confidence, tags=body.tags, source=body.source).json()
 @app.post("/api/memory/consolidate")
-async def consolidate(): return {"consolidated": engine.memory.consolidate()}
+async def consolidate(): return engine.sleep.run()
 @app.get("/api/self")
 async def self_model(): return engine.snapshot()["self"]
 @app.get("/api/workspace")
@@ -64,6 +66,20 @@ async def get_reflection(): return {"reflection": asdict(engine.last_reflection)
 @app.post("/api/reflection")
 async def reflection():
     r = engine.reflection.reflect(engine.workspace.get("input", ""), "", engine.memory.count(), engine.state.uncertainty); engine.last_reflection = r; return asdict(r)
+@app.get("/api/safety")
+async def safety(): return engine.safety.snapshot()
+@app.post("/api/safety/check")
+async def safety_check(body: ActionCheck): return asdict(engine.safety.evaluate(body.action, body.risk))
+@app.get("/api/tools")
+async def tools(): return {"items": engine.tools.snapshot()}
+@app.post("/api/tools")
+async def register_tool(body: ToolInput): return engine.tools.register(body.name, body.description, body.risk)
+@app.get("/api/tools/{name}/authorize")
+async def authorize_tool(name: str): return engine.tools.authorize(name)
+@app.get("/api/sleep")
+async def sleep_status(): return engine.sleep.snapshot()
+@app.post("/api/sleep")
+async def sleep(): return engine.sleep.run()
 @app.get("/api/settings")
 async def settings(): return {"autonomy_level": 1, "local_only": True, "cloud_models": False, "external_actions_require_approval": True}
 @app.websocket("/ws/events")
