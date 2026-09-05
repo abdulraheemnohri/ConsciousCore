@@ -2,13 +2,13 @@ import os
 import json
 from dataclasses import asdict
 from datetime import datetime, timezone
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from .core.engine import CognitiveEngine
 from .database import db
 
-VERSION = "1.5.0"
+VERSION = "1.6.0"
 app = FastAPI(title="ConsciousCore", version=VERSION)
 origins = [x.strip() for x in os.getenv("CONSCIOUSCORE_CORS", "http://127.0.0.1:5173,http://localhost:5173").split(",") if x.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["*"], allow_headers=["*"])
@@ -24,6 +24,7 @@ class MemoryInput(BaseModel):
     source: str = "user"
 class Goal(BaseModel): title: str = Field(min_length=1, max_length=500); priority: float = Field(default=.5, ge=0, le=1)
 class PlanRequest(BaseModel): goal: str = Field(min_length=1, max_length=1000); constraints: list[str] = Field(default_factory=list)
+class PlanStepUpdate(BaseModel): status: str
 class EntityInput(BaseModel): id: str; label: str; kind: str = "concept"
 class RelationInput(BaseModel): source: str; relation: str; target: str; confidence: float = Field(default=.5, ge=0, le=1)
 class ToolInput(BaseModel): name: str; description: str; risk: float = Field(default=.5, ge=0, le=1)
@@ -69,8 +70,27 @@ async def add_goal(body: Goal): return asdict(engine.goals.add(body.title, body.
 @app.patch("/api/goals/{goal_id}")
 async def update_goal(goal_id: int, progress: float | None = None, status: str | None = None):
     g = engine.goals.update(goal_id, progress, status); return asdict(g) if g else {"error": "goal_not_found"}
+@app.get("/api/plans")
+async def plans(limit: int = 100): return {"items": engine.planner.list(limit)}
 @app.post("/api/plans")
-async def create_plan(body: PlanRequest): return engine.planner.create(body.goal, body.constraints)
+async def create_plan(body: PlanRequest):
+    plan = engine.planner.create(body.goal, body.constraints); audit("plan.created", {"plan_id": plan["id"], "goal": body.goal}); return plan
+@app.get("/api/plans/{plan_id}")
+async def get_plan(plan_id: int):
+    plan = engine.planner.get(plan_id)
+    if not plan: raise HTTPException(status_code=404, detail="plan_not_found")
+    return plan
+@app.patch("/api/plans/{plan_id}/steps/{step_id}")
+async def update_plan_step(plan_id: int, step_id: int, body: PlanStepUpdate):
+    try: plan = engine.planner.update_step(plan_id, step_id, body.status)
+    except ValueError as exc: raise HTTPException(status_code=400, detail=str(exc))
+    if not plan: raise HTTPException(status_code=404, detail="plan_or_step_not_found")
+    audit("plan.step.updated", {"plan_id": plan_id, "step_id": step_id, "status": body.status}); return plan
+@app.delete("/api/plans/{plan_id}")
+async def delete_plan(plan_id: int):
+    deleted = engine.planner.delete(plan_id)
+    if not deleted: raise HTTPException(status_code=404, detail="plan_not_found")
+    audit("plan.deleted", {"plan_id": plan_id}); return {"deleted": True, "id": plan_id}
 @app.get("/api/reflection")
 async def get_reflection(): return {"reflection": asdict(engine.last_reflection) if engine.last_reflection else None, "history": engine.reflection.recent()}
 @app.post("/api/reflection")
