@@ -1,0 +1,19 @@
+system:
+  name: ConsciousCore
+  local_only: true
+  scientifically_conscious: false
+cognition:
+  attention: true
+  global_workspace: true
+  reflection: true
+  prediction: true
+  planning: true
+memory:
+  enabled: true
+  max_working_items: 32
+  max_retrieval: 8
+safety:
+  autonomy_level: 1
+  external_actions_require_approval: true
+  allow_auth_bypass: false
+  allow_secret_extraction: false
