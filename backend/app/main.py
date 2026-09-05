@@ -1,29 +1,39 @@
 import os
+import json
 from dataclasses import asdict
+from datetime import datetime, timezone
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from .core.engine import CognitiveEngine
+from .database import db
 
-app = FastAPI(title="ConsciousCore", version="1.4.0")
+VERSION = "1.5.0"
+app = FastAPI(title="ConsciousCore", version=VERSION)
 origins = [x.strip() for x in os.getenv("CONSCIOUSCORE_CORS", "http://127.0.0.1:5173,http://localhost:5173").split(",") if x.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["*"], allow_headers=["*"])
 engine = CognitiveEngine()
 
 class Chat(BaseModel): message: str = Field(min_length=1, max_length=20000)
 class MemoryInput(BaseModel):
-    content: str = Field(min_length=1, max_length=50000); kind: str = "semantic"
-    importance: float = Field(default=.5, ge=0, le=1); confidence: float = Field(default=.7, ge=0, le=1)
-    tags: list[str] = []; source: str = "user"
+    content: str = Field(min_length=1, max_length=50000)
+    kind: str = "semantic"
+    importance: float = Field(default=.5, ge=0, le=1)
+    confidence: float = Field(default=.7, ge=0, le=1)
+    tags: list[str] = Field(default_factory=list)
+    source: str = "user"
 class Goal(BaseModel): title: str = Field(min_length=1, max_length=500); priority: float = Field(default=.5, ge=0, le=1)
-class PlanRequest(BaseModel): goal: str = Field(min_length=1, max_length=1000); constraints: list[str] = []
+class PlanRequest(BaseModel): goal: str = Field(min_length=1, max_length=1000); constraints: list[str] = Field(default_factory=list)
 class EntityInput(BaseModel): id: str; label: str; kind: str = "concept"
 class RelationInput(BaseModel): source: str; relation: str; target: str; confidence: float = Field(default=.5, ge=0, le=1)
 class ToolInput(BaseModel): name: str; description: str; risk: float = Field(default=.5, ge=0, le=1)
 class ActionCheck(BaseModel): action: str; risk: float = Field(default=.5, ge=0, le=1)
 
+def audit(event_type: str, payload: dict):
+    db.execute("INSERT INTO audit_logs(event_type,payload,created_at) VALUES(?,?,?)", (event_type, json.dumps(payload), datetime.now(timezone.utc).isoformat()))
+
 @app.get("/health")
-async def health(): return {"ok": True, "service": "ConsciousCore", "version": "1.4.0"}
+async def health(): return {"ok": True, "service": "ConsciousCore", "version": VERSION}
 @app.get("/api/state")
 async def state(): return engine.snapshot()
 @app.post("/api/chat")
@@ -62,24 +72,28 @@ async def update_goal(goal_id: int, progress: float | None = None, status: str |
 @app.post("/api/plans")
 async def create_plan(body: PlanRequest): return engine.planner.create(body.goal, body.constraints)
 @app.get("/api/reflection")
-async def get_reflection(): return {"reflection": asdict(engine.last_reflection) if engine.last_reflection else None}
+async def get_reflection(): return {"reflection": asdict(engine.last_reflection) if engine.last_reflection else None, "history": engine.reflection.recent()}
 @app.post("/api/reflection")
 async def reflection():
     r = engine.reflection.reflect(engine.workspace.get("input", ""), "", engine.memory.count(), engine.state.uncertainty); engine.last_reflection = r; return asdict(r)
 @app.get("/api/safety")
 async def safety(): return engine.safety.snapshot()
 @app.post("/api/safety/check")
-async def safety_check(body: ActionCheck): return asdict(engine.safety.evaluate(body.action, body.risk))
+async def safety_check(body: ActionCheck):
+    result = asdict(engine.safety.evaluate(body.action, body.risk)); audit("safety.check", {"request": body.model_dump(), "result": result}); return result
 @app.get("/api/tools")
 async def tools(): return {"items": engine.tools.snapshot()}
 @app.post("/api/tools")
 async def register_tool(body: ToolInput): return engine.tools.register(body.name, body.description, body.risk)
 @app.get("/api/tools/{name}/authorize")
-async def authorize_tool(name: str): return engine.tools.authorize(name)
+async def authorize_tool(name: str):
+    result = engine.tools.authorize(name); audit("tool.authorization", {"tool": name, "result": result}); return result
 @app.get("/api/sleep")
 async def sleep_status(): return engine.sleep.snapshot()
 @app.post("/api/sleep")
 async def sleep(): return engine.sleep.run()
+@app.get("/api/audit")
+async def audit_logs(limit: int = 100): return {"items": db.fetchall("SELECT * FROM audit_logs ORDER BY id DESC LIMIT ?", (max(1, min(limit, 1000)),))}
 @app.get("/api/settings")
 async def settings(): return {"autonomy_level": 1, "local_only": True, "cloud_models": False, "external_actions_require_approval": True}
 @app.websocket("/ws/events")
