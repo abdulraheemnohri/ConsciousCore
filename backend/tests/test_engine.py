@@ -47,3 +47,29 @@ def test_safety_blocks_prohibited_action():
     result = e.safety.evaluate("credential_capture", .9)
     assert result.allowed is False
     assert result.requires_approval is False
+
+
+def test_plans_are_persistent_and_steps_update():
+    e1 = CognitiveEngine()
+    plan = e1.planner.create("Build the local cognitive runtime", ["offline", "safe"])
+    assert plan["id"]
+    assert len(plan["steps"]) == 5
+    e2 = CognitiveEngine()
+    loaded = e2.planner.get(plan["id"])
+    assert loaded["goal"] == plan["goal"]
+    updated = e2.planner.update_step(plan["id"], 1, "completed")
+    assert updated["steps"][0]["status"] == "completed"
+
+
+def test_planner_rejects_invalid_step_status():
+    e = CognitiveEngine()
+    plan = e.planner.create("Test planner validation")
+    with pytest.raises(ValueError):
+        e.planner.update_step(plan["id"], 1, "unknown")
+
+
+def test_plan_delete_is_persistent():
+    e = CognitiveEngine()
+    plan = e.planner.create("Delete me")
+    assert e.planner.delete(plan["id"]) is True
+    assert e.planner.get(plan["id"]) is None
