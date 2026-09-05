@@ -32,15 +32,44 @@ CREATE TABLE IF NOT EXISTS goals (
     progress REAL NOT NULL DEFAULT 0.0,
     created_at TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS settings (
-    key TEXT PRIMARY KEY,
-    value TEXT NOT NULL
+CREATE TABLE IF NOT EXISTS plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    goal TEXT NOT NULL,
+    constraints TEXT NOT NULL DEFAULT '[]',
+    steps TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS world_entities (
+    id TEXT PRIMARY KEY,
+    label TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'concept',
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS world_relations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source TEXT NOT NULL,
+    relation TEXT NOT NULL,
+    target TEXT NOT NULL,
+    confidence REAL NOT NULL DEFAULT 0.5,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS reflections (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    summary TEXT NOT NULL,
+    lessons TEXT NOT NULL DEFAULT '[]',
+    uncertainties TEXT NOT NULL DEFAULT '[]',
+    next_actions TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS audit_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     event_type TEXT NOT NULL,
     payload TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
 );
 """
 
