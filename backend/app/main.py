@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from .core.engine import CognitiveEngine
 from .database import db
 
-VERSION = "1.6.0"
+VERSION = "1.7.0"
 app = FastAPI(title="ConsciousCore", version=VERSION)
 origins = [x.strip() for x in os.getenv("CONSCIOUSCORE_CORS", "http://127.0.0.1:5173,http://localhost:5173").split(",") if x.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["*"], allow_headers=["*"])
@@ -29,6 +29,13 @@ class EntityInput(BaseModel): id: str; label: str; kind: str = "concept"
 class RelationInput(BaseModel): source: str; relation: str; target: str; confidence: float = Field(default=.5, ge=0, le=1)
 class ToolInput(BaseModel): name: str; description: str; risk: float = Field(default=.5, ge=0, le=1)
 class ActionCheck(BaseModel): action: str; risk: float = Field(default=.5, ge=0, le=1)
+class ModelRegister(BaseModel):
+    model_id: str = Field(min_length=1, max_length=200)
+    path: str = Field(min_length=1, max_length=2000)
+    context_size: int = Field(default=4096, ge=256, le=131072)
+    n_threads: int | None = Field(default=None, ge=1, le=256)
+    n_gpu_layers: int = Field(default=0, ge=0, le=999)
+class ModelActivate(BaseModel): model_id: str = Field(min_length=1, max_length=200)
 
 def audit(event_type: str, payload: dict):
     db.execute("INSERT INTO audit_logs(event_type,payload,created_at) VALUES(?,?,?)", (event_type, json.dumps(payload), datetime.now(timezone.utc).isoformat()))
@@ -91,6 +98,25 @@ async def delete_plan(plan_id: int):
     deleted = engine.planner.delete(plan_id)
     if not deleted: raise HTTPException(status_code=404, detail="plan_not_found")
     audit("plan.deleted", {"plan_id": plan_id}); return {"deleted": True, "id": plan_id}
+@app.get("/api/models")
+async def models(): return engine.model_manager.list()
+@app.post("/api/models/discover")
+async def discover_models():
+    found = engine.model_manager.discover_gguf(); audit("models.discovered", {"models": found}); return {"discovered": found, **engine.model_manager.list()}
+@app.post("/api/models/register")
+async def register_model(body: ModelRegister):
+    kwargs = {"n_ctx": body.context_size, "n_gpu_layers": body.n_gpu_layers}
+    if body.n_threads is not None: kwargs["n_threads"] = body.n_threads
+    try: info = engine.model_manager.register_gguf(body.model_id, body.path, **kwargs)
+    except (ValueError, OSError) as exc: raise HTTPException(status_code=400, detail=str(exc))
+    audit("model.registered", {"model_id": body.model_id, "path": body.path}); return info
+@app.post("/api/models/activate")
+async def activate_model(body: ModelActivate):
+    try: info = engine.activate_model(body.model_id)
+    except KeyError: raise HTTPException(status_code=404, detail="model_not_found")
+    audit("model.activated", {"model_id": body.model_id}); return info
+@app.get("/api/models/active")
+async def active_model(): return engine.model.info()
 @app.get("/api/reflection")
 async def get_reflection(): return {"reflection": asdict(engine.last_reflection) if engine.last_reflection else None, "history": engine.reflection.recent()}
 @app.post("/api/reflection")
