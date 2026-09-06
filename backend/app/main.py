@@ -6,9 +6,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel,Field
 from .core.engine import CognitiveEngine
 from .database import db
-VERSION="2.1.0"; app=FastAPI(title="ConsciousCore",version=VERSION)
+VERSION="2.2.0"; app=FastAPI(title="ConsciousCore",version=VERSION)
 origins=[x.strip() for x in os.getenv("CONSCIOUSCORE_CORS","http://127.0.0.1:5173,http://localhost:5173").split(",") if x.strip()]; app.add_middleware(CORSMiddleware,allow_origins=origins,allow_methods=["*"],allow_headers=["*"]); engine=CognitiveEngine()
 class Chat(BaseModel): message:str=Field(min_length=1,max_length=20000)
+class StateTransition(BaseModel): uncertainty:float|None=Field(default=None,ge=0,le=1); energy_delta:float=Field(default=0,ge=-1,le=1); valence_delta:float=Field(default=0,ge=-1,le=1)
+class StateRecovery(BaseModel): amount:float=Field(default=.1,ge=0,le=1)
 class MemoryInput(BaseModel): content:str=Field(min_length=1,max_length=50000); kind:str="semantic"; importance:float=Field(default=.5,ge=0,le=1); confidence:float=Field(default=.7,ge=0,le=1); tags:list[str]=Field(default_factory=list); source:str="user"
 class MemoryUpdate(BaseModel): kind:str|None=None; importance:float|None=Field(default=None,ge=0,le=1); confidence:float|None=Field(default=None,ge=0,le=1); tags:list[str]|None=None; source:str|None=None; consolidated:bool|None=None
 class Goal(BaseModel): title:str=Field(min_length=1,max_length=500); priority:float=Field(default=.5,ge=0,le=1)
@@ -34,6 +36,14 @@ async def loop_state(): return engine.loop.snapshot()
 @app.post("/api/loop/run")
 async def run_loop(body:Chat):
     result=await engine.process(body.message); audit("loop.completed",{"cycle_id":result["cycle"]["cycle_id"]}); return result
+@app.get("/api/internal-state")
+async def internal_state(): return {"state":engine.internal_state.snapshot(),"status":engine.internal_state.status()}
+@app.post("/api/internal-state/transition")
+async def transition_state(body:StateTransition):
+    result=engine.internal_state.transition(uncertainty=body.uncertainty,energy_delta=body.energy_delta,valence_delta=body.valence_delta); audit("internal_state.transition",result); return {"state":result,"status":engine.internal_state.status()}
+@app.post("/api/internal-state/recover")
+async def recover_state(body:StateRecovery):
+    result=engine.internal_state.recover(body.amount); audit("internal_state.recover",result); return {"state":result,"status":engine.internal_state.status()}
 @app.get("/api/memory")
 async def memories(q:str="",limit:int=20,kind:str|None=None,consolidated:bool|None=None): limit=max(1,min(limit,1000)); return {"items":[m.json() for m in engine.memory.search(q,limit,kind,consolidated)],"stats":engine.memory.stats()}
 @app.get("/api/memory/stats")
@@ -61,7 +71,7 @@ async def self_model(): return engine.snapshot()["self"]
 @app.get("/api/workspace")
 async def workspace(): return engine.workspace
 @app.get("/api/attention")
-async def attention(): return {"focus":engine.workspace.get("focus"),"items":engine.workspace.get("attention",[]),"uncertainty":engine.state.uncertainty}
+async def attention(): return {"focus":engine.workspace.get("focus"),"items":engine.workspace.get("attention",[]),"uncertainty":engine.internal_state.state.uncertainty}
 @app.get("/api/metacognition")
 async def metacognition(): return engine.meta
 @app.get("/api/prediction")
