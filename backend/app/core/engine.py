@@ -10,6 +10,7 @@ from .metacognition import Metacognition
 from .prediction import PredictionEngine
 from .world_model_v2 import WorldModelV2
 from .global_workspace_v2 import GlobalWorkspaceV2
+from .learning_v2 import LearningEngineV2
 from .safety import SafetyEngine
 from .tools import ToolRegistry
 from .sleep import SleepConsolidator
@@ -30,7 +31,7 @@ class CognitiveEngine:
         self.model = model or self.model_manager.get_active() or FallbackModel()
         self.memory = MemoryStore(); self.events = CognitiveEventBusV2(); self.attention = AttentionEngine(); self.goals = GoalManager(); self.planner = Planner(); self.reflection = ReflectionEngine()
         self.metacognition = Metacognition(); self.prediction = PredictionEngine(); self.world = WorldModelV2(); self.safety = SafetyEngine(1); self.tools = ToolRegistry(self.safety); self.sleep = SleepConsolidator(self.memory)
-        self.execution = ExecutionEngine(self.planner, self.safety, self.memory); self.internal_state = InternalStateEngine(); self.self_model_v2 = SelfModelEngine()
+        self.execution = ExecutionEngine(self.planner, self.safety, self.memory); self.internal_state = InternalStateEngine(); self.self_model_v2 = SelfModelEngine(); self.learning_v2 = LearningEngineV2()
         self.global_workspace_v2 = GlobalWorkspaceV2(self.events)
         self.state = self.internal_state.state; self.self_model = SelfModel(); self.workspace = {}; self.last_reflection = None; self.last_prediction = None; self.meta = {}; self.loop = CognitiveLoop(self)
 
@@ -41,4 +42,4 @@ class CognitiveEngine:
 
     def snapshot(self):
         self_v2 = self.self_model_v2.assess(model_backend=self.model.info().get("backend", "unknown"), memory_count=self.memory.count(), active_goals=len(self.goals.active()))
-        return {"state": self.internal_state.snapshot(), "self": asdict(self.self_model), "self_model_v2": self_v2, "workspace": self.workspace, "global_workspace_v2": self.global_workspace_v2.snapshot(), "memory_count": self.memory.count(), "goals": self.goals.snapshot(), "active_goals": self.goals.active(), "model": self.model.info(), "models": self.model_manager.list(), "reflection": asdict(self.last_reflection) if self.last_reflection else None, "metacognition": self.meta, "prediction": self.last_prediction, "world_model": self.world.snapshot(), "safety": self.safety.snapshot(), "tools": self.tools.snapshot(), "sleep": self.sleep.snapshot(), "execution": self.execution.snapshot(), "cognitive_loop": self.loop.snapshot(), "internal_state_status": self.internal_state.status(), "cognitive_events_v2": self.events.snapshot()}
+        return {"state": self.internal_state.snapshot(), "self": asdict(self.self_model), "self_model_v2": self_v2, "workspace": self.workspace, "global_workspace_v2": self.global_workspace_v2.snapshot(), "memory_count": self.memory.count(), "goals": self.goals.snapshot(), "active_goals": self.goals.active(), "model": self.model.info(), "models": self.model_manager.list(), "reflection": asdict(self.last_reflection) if self.last_reflection else None, "metacognition": self.meta, "prediction": self.last_prediction, "world_model": self.world.snapshot(), "safety": self.safety.snapshot(), "tools": self.tools.snapshot(), "sleep": self.sleep.snapshot(), "execution": self.execution.snapshot(), "cognitive_loop": self.loop.snapshot(), "internal_state_status": self.internal_state.status(), "cognitive_events_v2": self.events.snapshot(), "learning_v2": self.learning_v2.snapshot()}
