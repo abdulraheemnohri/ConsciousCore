@@ -13,12 +13,9 @@ from .tools import ToolRegistry
 from .sleep import SleepConsolidator
 from .execution import ExecutionEngine
 from .cognitive_loop import CognitiveLoop
+from .internal_state import InternalStateEngine
 from ..models.fallback import FallbackModel
 from ..models.manager import ModelManager
-
-@dataclass
-class InternalState:
-    arousal: float = .2; valence: float = 0; uncertainty: float = .5; energy: float = 1
 
 @dataclass
 class SelfModel:
@@ -33,7 +30,8 @@ class CognitiveEngine:
         self.metacognition = Metacognition(); self.prediction = PredictionEngine(); self.world = WorldModel()
         self.safety = SafetyEngine(1); self.tools = ToolRegistry(self.safety); self.sleep = SleepConsolidator(self.memory)
         self.execution = ExecutionEngine(self.planner, self.safety, self.memory)
-        self.state = InternalState(); self.self_model = SelfModel(); self.workspace = {}; self.last_reflection = None; self.last_prediction = None; self.meta = {}
+        self.internal_state = InternalStateEngine()
+        self.state = self.internal_state.state; self.self_model = SelfModel(); self.workspace = {}; self.last_reflection = None; self.last_prediction = None; self.meta = {}
         self.loop = CognitiveLoop(self)
 
     def activate_model(self, model_id: str):
@@ -43,4 +41,4 @@ class CognitiveEngine:
         return await self.loop.run(message)
 
     def snapshot(self):
-        return {"state": asdict(self.state), "self": asdict(self.self_model), "workspace": self.workspace, "memory_count": self.memory.count(), "goals": self.goals.snapshot(), "active_goals": self.goals.active(), "model": self.model.info(), "models": self.model_manager.list(), "reflection": asdict(self.last_reflection) if self.last_reflection else None, "metacognition": self.meta, "prediction": self.last_prediction, "world_model": self.world.snapshot(), "safety": self.safety.snapshot(), "tools": self.tools.snapshot(), "sleep": self.sleep.snapshot(), "execution": self.execution.snapshot(), "cognitive_loop": self.loop.snapshot()}
+        return {"state": self.internal_state.snapshot(), "self": asdict(self.self_model), "workspace": self.workspace, "memory_count": self.memory.count(), "goals": self.goals.snapshot(), "active_goals": self.goals.active(), "model": self.model.info(), "models": self.model_manager.list(), "reflection": asdict(self.last_reflection) if self.last_reflection else None, "metacognition": self.meta, "prediction": self.last_prediction, "world_model": self.world.snapshot(), "safety": self.safety.snapshot(), "tools": self.tools.snapshot(), "sleep": self.sleep.snapshot(), "execution": self.execution.snapshot(), "cognitive_loop": self.loop.snapshot(), "internal_state_status": self.internal_state.status()}
