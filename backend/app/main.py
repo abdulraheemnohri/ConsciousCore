@@ -6,11 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel,Field
 from .core.engine import CognitiveEngine
 from .database import db
-VERSION="2.2.0"; app=FastAPI(title="ConsciousCore",version=VERSION)
+VERSION="2.3.0"; app=FastAPI(title="ConsciousCore",version=VERSION)
 origins=[x.strip() for x in os.getenv("CONSCIOUSCORE_CORS","http://127.0.0.1:5173,http://localhost:5173").split(",") if x.strip()]; app.add_middleware(CORSMiddleware,allow_origins=origins,allow_methods=["*"],allow_headers=["*"]); engine=CognitiveEngine()
 class Chat(BaseModel): message:str=Field(min_length=1,max_length=20000)
 class StateTransition(BaseModel): uncertainty:float|None=Field(default=None,ge=0,le=1); energy_delta:float=Field(default=0,ge=-1,le=1); valence_delta:float=Field(default=0,ge=-1,le=1)
 class StateRecovery(BaseModel): amount:float=Field(default=.1,ge=0,le=1)
+class SelfModelUpdate(BaseModel): role:str|None=Field(default=None,max_length=200); autonomy_level:int|None=Field(default=None,ge=0,le=3)
 class MemoryInput(BaseModel): content:str=Field(min_length=1,max_length=50000); kind:str="semantic"; importance:float=Field(default=.5,ge=0,le=1); confidence:float=Field(default=.7,ge=0,le=1); tags:list[str]=Field(default_factory=list); source:str="user"
 class MemoryUpdate(BaseModel): kind:str|None=None; importance:float|None=Field(default=None,ge=0,le=1); confidence:float|None=Field(default=None,ge=0,le=1); tags:list[str]|None=None; source:str|None=None; consolidated:bool|None=None
 class Goal(BaseModel): title:str=Field(min_length=1,max_length=500); priority:float=Field(default=.5,ge=0,le=1)
@@ -34,16 +35,21 @@ async def chat(body:Chat): return await engine.process(body.message)
 @app.get("/api/loop")
 async def loop_state(): return engine.loop.snapshot()
 @app.post("/api/loop/run")
-async def run_loop(body:Chat):
-    result=await engine.process(body.message); audit("loop.completed",{"cycle_id":result["cycle"]["cycle_id"]}); return result
+async def run_loop(body:Chat): result=await engine.process(body.message); audit("loop.completed",{"cycle_id":result["cycle"]["cycle_id"]}); return result
 @app.get("/api/internal-state")
 async def internal_state(): return {"state":engine.internal_state.snapshot(),"status":engine.internal_state.status()}
 @app.post("/api/internal-state/transition")
-async def transition_state(body:StateTransition):
-    result=engine.internal_state.transition(uncertainty=body.uncertainty,energy_delta=body.energy_delta,valence_delta=body.valence_delta); audit("internal_state.transition",result); return {"state":result,"status":engine.internal_state.status()}
+async def transition_state(body:StateTransition): result=engine.internal_state.transition(uncertainty=body.uncertainty,energy_delta=body.energy_delta,valence_delta=body.valence_delta); audit("internal_state.transition",result); return {"state":result,"status":engine.internal_state.status()}
 @app.post("/api/internal-state/recover")
-async def recover_state(body:StateRecovery):
-    result=engine.internal_state.recover(body.amount); audit("internal_state.recover",result); return {"state":result,"status":engine.internal_state.status()}
+async def recover_state(body:StateRecovery): result=engine.internal_state.recover(body.amount); audit("internal_state.recover",result); return {"state":result,"status":engine.internal_state.status()}
+@app.get("/api/self")
+async def self_model(): return engine.snapshot()["self_model_v2"]
+@app.patch("/api/self")
+async def update_self_model(body:SelfModelUpdate): result=engine.self_model_v2.update_role(body.role,body.autonomy_level); audit("self_model.updated",result); return result
+@app.get("/api/self/capabilities")
+async def self_capabilities(): return {"capabilities":engine.self_model_v2.model.capabilities}
+@app.get("/api/self/limitations")
+async def self_limitations(): return {"limitations":engine.self_model_v2.model.limitations,"boundaries":engine.self_model_v2.model.boundaries}
 @app.get("/api/memory")
 async def memories(q:str="",limit:int=20,kind:str|None=None,consolidated:bool|None=None): limit=max(1,min(limit,1000)); return {"items":[m.json() for m in engine.memory.search(q,limit,kind,consolidated)],"stats":engine.memory.stats()}
 @app.get("/api/memory/stats")
@@ -66,8 +72,6 @@ async def delete_memory(memory_id:int):
     audit("memory.deleted",{"memory_id":memory_id}); return {"deleted":True,"id":memory_id}
 @app.post("/api/memory/consolidate")
 async def consolidate(): result=engine.sleep.run(); audit("memory.consolidated",result); return result
-@app.get("/api/self")
-async def self_model(): return engine.snapshot()["self"]
 @app.get("/api/workspace")
 async def workspace(): return engine.workspace
 @app.get("/api/attention")
@@ -162,7 +166,7 @@ async def sleep(): return engine.sleep.run()
 @app.get("/api/audit")
 async def audit_logs(limit:int=100): return {"items":db.fetchall("SELECT * FROM audit_logs ORDER BY id DESC LIMIT ?",(max(1,min(limit,1000)),))}
 @app.get("/api/settings")
-async def settings(): return {"autonomy_level":1,"local_only":True,"cloud_models":False,"external_actions_require_approval":True}
+async def settings(): return {"autonomy_level":engine.self_model_v2.model.autonomy_level,"local_only":True,"cloud_models":False,"external_actions_require_approval":True}
 @app.websocket("/ws/events")
 async def events(ws:WebSocket):
     await ws.accept(); q=engine.events.subscribe()
