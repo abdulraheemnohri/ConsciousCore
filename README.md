@@ -1,53 +1,80 @@
 # ConsciousCore
 
-**Persistent Memory. Self Model. Attention. Reflection. One Continuous Cognitive System.**
+**Persistent Memory · Self Model · World Model · Global Workspace · Reflection · Learning · Autobiographical Timeline**
 
-ConsciousCore is a local-first, consciousness-inspired cognitive operating layer for AI systems. It implements persistent memory, attention, a global workspace, internal state, goals, reflection, and a pluggable local-model interface.
+ConsciousCore is a local-first, consciousness-inspired cognitive operating layer for AI systems. It combines persistent memory, attention, global-workspace coordination, internal computational state, goals, planning, safety, prediction, metacognition, reflection, bounded learning, event history, autobiographical-style episode storage, and pluggable local model inference.
 
-> **Scientific boundary:** ConsciousCore does not claim to create subjective consciousness, sentience, self-awareness, or qualia. Terms such as self-model and reflection describe engineered computational mechanisms.
+> **Scientific boundary:** ConsciousCore does not claim to create subjective consciousness, sentience, qualia, or proof of experience. Self-model, internal-state, reflection, global-workspace, and autobiographical terms describe engineered computational mechanisms.
 
-## Current V1 foundation
-
-- FastAPI local runtime
-- SQLite persistent memory
-- Typed memory: working, episodic, semantic, procedural, self, meta
-- Importance and confidence scoring
-- Memory retrieval and access tracking
-- Memory consolidation endpoint
-- Global workspace state
-- Internal state: arousal, valence, uncertainty, energy
-- Self-model metadata
-- Goals API
-- Reflection endpoint
-- WebSocket event stream
-- Local-only deterministic fallback model
-- Optional GGUF inference through `llama-cpp-python`
-- Local model manager
-- CORS configuration through environment variables
-- Pytest + pytest-asyncio test foundation
-- GitHub Actions CI
-
-## Architecture
+## Implemented architecture
 
 ```text
 Input
-  -> Perception
-  -> Attention
-  -> Global Workspace
-  -> Memory Retrieval
-  -> Self / World State
-  -> Internal State
-  -> Goal Evaluation
-  -> Reasoning / Model
-  -> Planning
-  -> Safety
-  -> Action / Response
-  -> Observation
-  -> Reflection
-  -> Learning
-  -> Memory Consolidation
-  -> Loop
+ → Perception
+ → Attention
+ → Global Workspace V2
+ → Memory Retrieval
+ → Self Model V2 / World Model V2
+ → Internal State V3
+ → Goal Evaluation
+ → Reasoning / Local Model
+ → Planning
+ → Safety + Approval Gate
+ → Local Simulation / Response
+ → Observation
+ → Reflection
+ → Learning V2
+ → Memory Consolidation
+ → Autobiographical Memory V2
+ → Cognitive Event Bus V2
+ → Loop
 ```
+
+## Core features
+
+- FastAPI local runtime + SQLite persistence
+- Cognitive Loop with observable phases and cycle IDs
+- Typed persistent memory with importance/confidence, retrieval, update/delete and consolidation
+- Attention ranking and metacognitive confidence/uncertainty
+- Global Workspace V2 with candidate competition, winner selection, broadcast, interruption and subscriptions
+- World Model V2 with entities, properties, temporal relations, events, beliefs, history, queries and heuristic contradiction detection
+- Goals and persistent plans with step dependencies and lifecycle controls
+- Reflection and bounded Learning V2 with lessons, strategies, evidence and recommendations
+- Cognitive Event Bus V2 with persistent timeline, filters, cycle/phase queries, correlation IDs and parent IDs
+- Autobiographical Memory V2 with persistent cognitive episodes, timeline, search, archive, statistics and links to cycles/plans/reflections/learning
+- Self Model V2 with capabilities, limitations, autonomy and explicit scientific boundaries
+- Internal computational state with energy, arousal, attention load, stress, uncertainty, confidence and stability
+- Safety engine with autonomy levels 0–3 and approval-gated execution
+- Prohibited actions: authentication bypass, secret extraction, credential capture, MFA/CAPTCHA bypass and destructive system changes
+- Local GGUF model manager and optional llama.cpp adapter
+- Deterministic fallback model when no local model is available
+- Persistent runtime Settings V2 with bounded controls and immutable safety invariants
+- WebSocket event stream
+- Audit log
+- Unified responsive frontend control center with dashboard, chat, loop, memory, goals, planner, world model, workspace, events, learning, autobiographical timeline, self model, state, safety, models, sleep, tools, settings and audit views
+
+## Runtime settings
+
+Settings are local and persisted in SQLite. Supported controls include autonomy level, memory enablement/limits, attention, global workspace, reflection, prediction, planning, bounded learning, autobiographical memory and event-history limits. Safety invariants remain enabled and cannot be changed through the settings layer.
+
+## Autobiographical Memory V2 API
+
+The runtime exposes an extension router under `/api/autobiographical/v2`:
+
+- `GET /api/autobiographical/v2`
+- `GET /api/autobiographical/v2/episodes`
+- `GET /api/autobiographical/v2/episodes/{id}`
+- `POST /api/autobiographical/v2/episodes`
+- `GET /api/autobiographical/v2/search`
+- `GET /api/autobiographical/v2/timeline`
+- `GET /api/autobiographical/v2/stats`
+- `PATCH /api/autobiographical/v2/episodes/{id}/archive`
+
+## Settings V2 API
+
+- `GET /api/settings/v2`
+- `PATCH /api/settings/v2`
+- `POST /api/settings/v2/reset`
 
 ## Run locally
 
@@ -62,46 +89,34 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-The SQLite database is created automatically at `data/consciouscore.db` by default. Set `CONSCIOUSCORE_DB` to choose another local path.
+SQLite is created automatically at `data/consciouscore.db` by default. Set `CONSCIOUSCORE_DB` for another local path.
 
-## API
+Frontend:
 
-- `GET /health`
-- `GET /api/state`
-- `POST /api/chat`
-- `GET /api/memory`
-- `POST /api/memory`
-- `POST /api/memory/consolidate`
-- `GET /api/self`
-- `GET /api/workspace`
-- `GET /api/attention`
-- `GET /api/goals`
-- `POST /api/goals`
-- `POST /api/reflection`
-- `GET /api/settings`
-- `WS /ws/events`
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-## Local GGUF model
+Set `VITE_API_URL` when the backend is not on `http://127.0.0.1:8000`.
 
-The llama.cpp adapter is optional. Install `llama-cpp-python`, keep GGUF files locally, then register a model through the Python `ModelManager`. No cloud provider or API key is required by the architecture.
-
-## Safety principles
+## Safety and autonomy
 
 - Local-first by default
+- No cloud inference is required by the architecture
 - External actions require explicit approval
-- No authentication bypass
-- No CAPTCHA or MFA bypass
-- No password, OTP, cookie, or session-token extraction
-- No unrestricted self-modifying code
-- Learning starts with memory, strategies, configuration, and evaluation rather than automatic model-weight rewriting
+- Execution engine is a local simulation/state-transition layer unless a future, separately approved integration is added
+- No password, OTP, cookie or session-token extraction
+- No authentication, MFA or CAPTCHA bypass
+- No unrestricted self-modifying source code
+- Learning changes bounded memory/strategy/configuration, not model weights automatically
 
-## Development
-
-Run tests with:
+## Testing
 
 ```bash
 cd backend
 PYTHONPATH=. pytest -q
 ```
 
-The project is intentionally being built in incremental layers. Future modules include richer attention, world modeling, planning, prediction, metacognition, tool permissions, model downloading, backup/restore, analytics, and a complete multi-page UI.
+Remote GitHub status checks are not treated as proof of passing tests unless GitHub reports an actual check result.
