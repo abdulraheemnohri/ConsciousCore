@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel,Field
 from .core.engine import CognitiveEngine
 from .database import db
-VERSION="1.9.0"; app=FastAPI(title="ConsciousCore",version=VERSION)
+VERSION="2.0.0"; app=FastAPI(title="ConsciousCore",version=VERSION)
 origins=[x.strip() for x in os.getenv("CONSCIOUSCORE_CORS","http://127.0.0.1:5173,http://localhost:5173").split(",") if x.strip()]; app.add_middleware(CORSMiddleware,allow_origins=origins,allow_methods=["*"],allow_headers=["*"]); engine=CognitiveEngine()
 class Chat(BaseModel): message:str=Field(min_length=1,max_length=20000)
 class MemoryInput(BaseModel): content:str=Field(min_length=1,max_length=50000); kind:str="semantic"; importance:float=Field(default=.5,ge=0,le=1); confidence:float=Field(default=.7,ge=0,le=1); tags:list[str]=Field(default_factory=list); source:str="user"
@@ -15,6 +15,7 @@ class Goal(BaseModel): title:str=Field(min_length=1,max_length=500); priority:fl
 class GoalUpdate(BaseModel): progress:float|None=Field(default=None,ge=0,le=1); status:str|None=None; priority:float|None=Field(default=None,ge=0,le=1)
 class PlanRequest(BaseModel): goal:str=Field(min_length=1,max_length=1000); constraints:list[str]=Field(default_factory=list)
 class PlanStepUpdate(BaseModel): status:str
+class ExecutionRequest(BaseModel): risk:float=Field(default=.5,ge=0,le=1); approved:bool=False
 class EntityInput(BaseModel): id:str; label:str; kind:str="concept"
 class RelationInput(BaseModel): source:str; relation:str; target:str; confidence:float=Field(default=.5,ge=0,le=1)
 class ToolInput(BaseModel): name:str; description:str; risk:float=Field(default=.5,ge=0,le=1)
@@ -95,6 +96,14 @@ async def update_plan_step(plan_id:int,step_id:int,body:PlanStepUpdate):
     except ValueError as exc: raise HTTPException(400,str(exc))
     if not p: raise HTTPException(404,"plan_or_step_not_found")
     audit("plan.step.updated",{"plan_id":plan_id,"step_id":step_id,"status":body.status}); return p
+@app.post("/api/plans/{plan_id}/steps/{step_id}/execute")
+async def execute_plan_step(plan_id:int,step_id:int,body:ExecutionRequest):
+    try: result=engine.execution.advance(plan_id,step_id,body.risk,body.approved)
+    except ValueError as exc: raise HTTPException(400,str(exc))
+    if not result: raise HTTPException(404,"plan_or_step_not_found")
+    audit("plan.step.execution",result); return result
+@app.get("/api/execution")
+async def execution_state(): return {"last":engine.execution.snapshot(),"safety":engine.safety.snapshot()}
 @app.delete("/api/plans/{plan_id}")
 async def delete_plan(plan_id:int):
     if not engine.planner.delete(plan_id): raise HTTPException(404,"plan_not_found")
