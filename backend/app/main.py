@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel,Field
 from .core.engine import CognitiveEngine
 from .database import db
-VERSION="2.4.0"; app=FastAPI(title="ConsciousCore",version=VERSION)
+VERSION="2.5.0"; app=FastAPI(title="ConsciousCore",version=VERSION)
 origins=[x.strip() for x in os.getenv("CONSCIOUSCORE_CORS","http://127.0.0.1:5173,http://localhost:5173").split(",") if x.strip()]; app.add_middleware(CORSMiddleware,allow_origins=origins,allow_methods=["*"],allow_headers=["*"]); engine=CognitiveEngine()
 class Chat(BaseModel): message:str=Field(min_length=1,max_length=20000)
 class StateTransition(BaseModel): uncertainty:float|None=Field(default=None,ge=0,le=1); energy_delta:float=Field(default=0,ge=-1,le=1); valence_delta:float=Field(default=0,ge=-1,le=1)
@@ -24,6 +24,10 @@ class EntityUpdate(BaseModel): label:str|None=None; kind:str|None=None; properti
 class RelationInput(BaseModel): source:str; relation:str; target:str; confidence:float=Field(default=.5,ge=0,le=1); valid_from:str|None=None; valid_to:str|None=None; properties:dict={}
 class EventInput(BaseModel): event_type:str; entity_ids:list[str]=[]; payload:dict={}; timestamp:str|None=None; source:str="system"
 class BeliefInput(BaseModel): statement:str=Field(min_length=1,max_length=5000); confidence:float=Field(default=.5,ge=0,le=1); evidence_refs:list[str]=[]; status:str="uncertain"
+class WorkspaceCandidateInput(BaseModel): source:str=Field(min_length=1,max_length=100); content:str=Field(min_length=1,max_length=20000); salience:float=Field(default=.5,ge=0,le=1); confidence:float=Field(default=.5,ge=0,le=1); urgency:float=Field(default=.5,ge=0,le=1); novelty:float=Field(default=.5,ge=0,le=1); relevance:float=Field(default=.5,ge=0,le=1); ttl:float=Field(default=30,ge=0,le=86400)
+class WorkspaceBroadcastInput(BaseModel): candidate_id:str|None=None; approved:bool=False
+class WorkspaceInterruptInput(BaseModel): reason:str=Field(default="higher-priority candidate",max_length=500)
+class WorkspaceSubscriptionInput(BaseModel): module_name:str=Field(min_length=1,max_length=100)
 class ToolInput(BaseModel): name:str; description:str; risk:float=Field(default=.5,ge=0,le=1)
 class ActionCheck(BaseModel): action:str; risk:float=Field(default=.5,ge=0,le=1)
 class ModelRegister(BaseModel): model_id:str=Field(min_length=1,max_length=200); path:str=Field(min_length=1,max_length=2000); context_size:int=Field(default=4096,ge=256,le=131072); n_threads:int|None=Field(default=None,ge=1,le=256); n_gpu_layers:int=Field(default=0,ge=0,le=999)
@@ -82,6 +86,27 @@ async def consolidate(): result=engine.sleep.run(); audit("memory.consolidated",
 async def workspace(): return engine.workspace
 @app.get("/api/attention")
 async def attention(): return {"focus":engine.workspace.get("focus"),"items":engine.workspace.get("attention",[]),"uncertainty":engine.internal_state.state.uncertainty}
+@app.get("/api/workspace/v2")
+async def workspace_v2(): return engine.global_workspace_v2.snapshot()
+@app.post("/api/workspace/v2/candidates")
+async def workspace_candidate(body:WorkspaceCandidateInput):
+    result=engine.global_workspace_v2.submit_candidate(**body.model_dump()); audit("workspace.candidate.created",{"candidate_id":result["id"]}); return result
+@app.post("/api/workspace/v2/select")
+async def workspace_select(): return {"winner":engine.global_workspace_v2.select_winner(),"snapshot":engine.global_workspace_v2.snapshot()}
+@app.post("/api/workspace/v2/broadcast")
+async def workspace_broadcast(body:WorkspaceBroadcastInput):
+    try: result=engine.global_workspace_v2.broadcast(body.candidate_id,body.approved)
+    except PermissionError as exc: raise HTTPException(403,str(exc))
+    except (KeyError,ValueError) as exc: raise HTTPException(400,str(exc))
+    audit("workspace.broadcast",result); return result
+@app.post("/api/workspace/v2/interrupt")
+async def workspace_interrupt(body:WorkspaceInterruptInput): result=engine.global_workspace_v2.interrupt(body.reason); audit("workspace.interruption",result); return result
+@app.get("/api/workspace/v2/history")
+async def workspace_history(limit:int=50): return {"items":engine.global_workspace_v2.history(limit)}
+@app.post("/api/workspace/v2/subscribe")
+async def workspace_subscribe(body:WorkspaceSubscriptionInput): return engine.global_workspace_v2.subscribe(body.module_name)
+@app.delete("/api/workspace/v2/subscribe/{module}")
+async def workspace_unsubscribe(module:str): return engine.global_workspace_v2.unsubscribe(module)
 @app.get("/api/metacognition")
 async def metacognition(): return engine.meta
 @app.get("/api/prediction")
