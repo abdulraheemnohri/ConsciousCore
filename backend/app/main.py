@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel,Field
 from .core.engine import CognitiveEngine
 from .database import db
-VERSION="2.3.0"; app=FastAPI(title="ConsciousCore",version=VERSION)
+VERSION="2.4.0"; app=FastAPI(title="ConsciousCore",version=VERSION)
 origins=[x.strip() for x in os.getenv("CONSCIOUSCORE_CORS","http://127.0.0.1:5173,http://localhost:5173").split(",") if x.strip()]; app.add_middleware(CORSMiddleware,allow_origins=origins,allow_methods=["*"],allow_headers=["*"]); engine=CognitiveEngine()
 class Chat(BaseModel): message:str=Field(min_length=1,max_length=20000)
 class StateTransition(BaseModel): uncertainty:float|None=Field(default=None,ge=0,le=1); energy_delta:float=Field(default=0,ge=-1,le=1); valence_delta:float=Field(default=0,ge=-1,le=1)
@@ -19,8 +19,11 @@ class GoalUpdate(BaseModel): progress:float|None=Field(default=None,ge=0,le=1); 
 class PlanRequest(BaseModel): goal:str=Field(min_length=1,max_length=1000); constraints:list[str]=Field(default_factory=list)
 class PlanStepUpdate(BaseModel): status:str
 class ExecutionRequest(BaseModel): risk:float=Field(default=.5,ge=0,le=1); approved:bool=False
-class EntityInput(BaseModel): id:str; label:str; kind:str="concept"
-class RelationInput(BaseModel): source:str; relation:str; target:str; confidence:float=Field(default=.5,ge=0,le=1)
+class EntityInput(BaseModel): id:str=Field(min_length=1,max_length=200); label:str=Field(min_length=1,max_length=500); kind:str="concept"; properties:dict={}; confidence:float=Field(default=.5,ge=0,le=1)
+class EntityUpdate(BaseModel): label:str|None=None; kind:str|None=None; properties:dict|None=None; confidence:float|None=Field(default=None,ge=0,le=1); active:bool|None=None
+class RelationInput(BaseModel): source:str; relation:str; target:str; confidence:float=Field(default=.5,ge=0,le=1); valid_from:str|None=None; valid_to:str|None=None; properties:dict={}
+class EventInput(BaseModel): event_type:str; entity_ids:list[str]=[]; payload:dict={}; timestamp:str|None=None; source:str="system"
+class BeliefInput(BaseModel): statement:str=Field(min_length=1,max_length=5000); confidence:float=Field(default=.5,ge=0,le=1); evidence_refs:list[str]=[]; status:str="uncertain"
 class ToolInput(BaseModel): name:str; description:str; risk:float=Field(default=.5,ge=0,le=1)
 class ActionCheck(BaseModel): action:str; risk:float=Field(default=.5,ge=0,le=1)
 class ModelRegister(BaseModel): model_id:str=Field(min_length=1,max_length=200); path:str=Field(min_length=1,max_length=2000); context_size:int=Field(default=4096,ge=256,le=131072); n_threads:int|None=Field(default=None,ge=1,le=256); n_gpu_layers:int=Field(default=0,ge=0,le=999)
@@ -45,7 +48,10 @@ async def recover_state(body:StateRecovery): result=engine.internal_state.recove
 @app.get("/api/self")
 async def self_model(): return engine.snapshot()["self_model_v2"]
 @app.patch("/api/self")
-async def update_self_model(body:SelfModelUpdate): result=engine.self_model_v2.update_role(body.role,body.autonomy_level); audit("self_model.updated",result); return result
+async def update_self_model(body:SelfModelUpdate):
+    result=engine.self_model_v2.update_role(body.role,body.autonomy_level)
+    if body.autonomy_level is not None: engine.safety.autonomy_level=body.autonomy_level
+    audit("self_model.updated",result); return result
 @app.get("/api/self/capabilities")
 async def self_capabilities(): return {"capabilities":engine.self_model_v2.model.capabilities}
 @app.get("/api/self/limitations")
@@ -82,10 +88,27 @@ async def metacognition(): return engine.meta
 async def prediction(): return engine.last_prediction
 @app.get("/api/world")
 async def world(): return engine.world.snapshot()
+@app.get("/api/world/query")
+async def world_query(q:str=""): return engine.world.query(q)
 @app.post("/api/world/entities")
-async def add_entity(body:EntityInput): return engine.world.add_entity(body.id,body.label,body.kind)
+async def add_entity(body:EntityInput): result=engine.world.add_entity(body.id,body.label,body.kind,body.properties,body.confidence); audit("world.entity.upserted",{"entity_id":body.id}); return result
+@app.patch("/api/world/entities/{entity_id}")
+async def update_entity(entity_id:str,body:EntityUpdate):
+    result=engine.world.update_entity(entity_id,**body.model_dump(exclude_none=True))
+    if not result: raise HTTPException(404,"world_entity_not_found")
+    audit("world.entity.updated",{"entity_id":entity_id}); return result
+@app.get("/api/world/history/{entity_id}")
+async def entity_history(entity_id:str): return {"entity_id":entity_id,"history":engine.world.history(entity_id)}
 @app.post("/api/world/relations")
-async def add_relation(body:RelationInput): return engine.world.relate(body.source,body.relation,body.target,body.confidence)
+async def add_relation(body:RelationInput): result=engine.world.add_relation(body.source,body.relation,body.target,body.confidence,body.valid_from,body.valid_to,body.properties); audit("world.relation.created",{"relation_id":result["id"]}); return result
+@app.post("/api/world/relations/{relation_id}/close")
+async def close_relation(relation_id:int,valid_to:str|None=None): result=engine.world.close_relation(relation_id,valid_to); audit("world.relation.closed",{"relation_id":relation_id}); return result
+@app.post("/api/world/events")
+async def add_event(body:EventInput): result=engine.world.add_event(body.event_type,body.entity_ids,body.payload,body.timestamp,body.source); audit("world.event.created",{"event_id":result["id"]}); return result
+@app.post("/api/world/beliefs")
+async def add_belief(body:BeliefInput): result=engine.world.add_belief(body.statement,body.confidence,body.evidence_refs,body.status); audit("world.belief.created",{"belief_id":result["id"]}); return result
+@app.get("/api/world/contradictions")
+async def world_contradictions(): return {"items":engine.world.detect_contradictions()}
 @app.get("/api/goals")
 async def goals(): return {"items":engine.goals.snapshot()}
 @app.post("/api/goals")
