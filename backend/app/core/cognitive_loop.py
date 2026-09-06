@@ -49,10 +49,11 @@ class CognitiveLoop:
             await self._phase("perception", {"message_length": len(message)})
             memories = self.engine.memory.search(message)
             await self._phase("attention", {"memory_candidates": len(memories)})
-            ranked = self.engine.attention.score(message, [m.content for m in memories], urgency=self.engine.state.arousal)
-            self.engine.state.uncertainty = max(.05, .8 - len(memories) * .1)
-            self.engine.meta = self.engine.metacognition.evaluate(self.engine.state.uncertainty, len(memories))
-            self.engine.last_prediction = self.engine.prediction.predict(message, self.engine.state.uncertainty)
+            ranked = self.engine.attention.score(message, [m.content for m in memories], urgency=self.engine.internal_state.state.arousal)
+            uncertainty = max(.05, .8 - len(memories) * .1)
+            state = self.engine.internal_state.observe(input_length=len(message), memory_count=len(memories), uncertainty=uncertainty)
+            self.engine.meta = self.engine.metacognition.evaluate(state["uncertainty"], len(memories))
+            self.engine.last_prediction = self.engine.prediction.predict(message, state["uncertainty"])
             self.engine.workspace = {
                 "input": message, "focus": message,
                 "attention": [asdict(x) for x in ranked],
@@ -60,12 +61,13 @@ class CognitiveLoop:
                 "model": self.engine.model.info(),
                 "metacognition": self.engine.meta,
                 "prediction": self.engine.last_prediction,
+                "internal_state": state,
                 "cycle_id": self.counter,
             }
             await self._phase("workspace", self.engine.workspace)
             await self._phase("memory", {"retrieved": len(memories)})
             await self._phase("self_world", {"self": asdict(self.engine.self_model), "world_entities": len(self.engine.world.snapshot()["entities"])})
-            await self._phase("internal_state", asdict(self.engine.state))
+            await self._phase("internal_state", {"state": state, "status": self.engine.internal_state.status()})
             goals = self.engine.goals.active()
             self.current.active_goal = goals[0] if goals else None
             await self._phase("goal_evaluation", {"active_goals": len(goals), "selected": self.current.active_goal})
@@ -80,16 +82,17 @@ class CognitiveLoop:
             await self._phase("execution", {"mode": "approval-gated local simulation", "plan_id": self.current.plan_id})
             response = await self.engine.model.generate(message, [m.content for m in memories])
             await self._phase("observation", {"response_length": len(response)})
-            saved = self.engine.memory.add("User: " + message + "\nSystem: " + response, kind="episodic", importance=.55, confidence=max(.1, 1-self.engine.state.uncertainty), source="conversation")
-            self.engine.last_reflection = self.engine.reflection.reflect(message, response, self.engine.memory.count(), self.engine.state.uncertainty)
+            saved = self.engine.memory.add("User: " + message + "\nSystem: " + response, kind="episodic", importance=.55, confidence=max(.1, 1-self.engine.internal_state.state.uncertainty), source="conversation")
+            self.engine.last_reflection = self.engine.reflection.reflect(message, response, self.engine.memory.count(), self.engine.internal_state.state.uncertainty)
             await self._phase("reflection", asdict(self.engine.last_reflection))
-            await self._phase("learning", {"memory_id": saved.id, "lesson_count": len(self.engine.last_reflection.lessons)})
+            learned = self.engine.internal_state.transition(energy_delta=-.01, valence_delta=.01)
+            await self._phase("learning", {"memory_id": saved.id, "lesson_count": len(self.engine.last_reflection.lessons), "state": learned})
             await self._phase("consolidation", {"deferred": True, "reason": "consolidation is managed by sleep cycle"})
             self.current.status = "completed"
             await self._phase("idle", {"cycle_id": self.counter, "status": "completed"})
             return {
                 "response": response, "cycle": asdict(self.current),
-                "memories": [m.json() for m in memories], "state": asdict(self.engine.state),
+                "memories": [m.json() for m in memories], "state": self.engine.internal_state.snapshot(),
                 "workspace": self.engine.workspace, "reflection": asdict(self.engine.last_reflection),
                 "metacognition": self.engine.meta, "prediction": self.engine.last_prediction,
             }
