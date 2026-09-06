@@ -23,11 +23,7 @@ class CognitiveCycle:
     error: str | None = None
 
 class CognitiveLoop:
-    """Observable coordinator for the consciousness-inspired cognitive loop.
-
-    It orchestrates existing subsystems without claiming subjective consciousness.
-    External side effects remain behind the existing safety/approval boundary.
-    """
+    """Observable coordinator for a bounded consciousness-inspired cognitive loop."""
     def __init__(self, engine):
         self.engine = engine
         self.counter = 0
@@ -54,30 +50,18 @@ class CognitiveLoop:
             state = self.engine.internal_state.observe(input_length=len(message), memory_count=len(memories), uncertainty=uncertainty)
             self.engine.meta = self.engine.metacognition.evaluate(state["uncertainty"], len(memories))
             self.engine.last_prediction = self.engine.prediction.predict(message, state["uncertainty"])
-            self.engine.workspace = {
-                "input": message, "focus": message,
-                "attention": [asdict(x) for x in ranked],
-                "memories": [m.json() for m in memories],
-                "model": self.engine.model.info(),
-                "metacognition": self.engine.meta,
-                "prediction": self.engine.last_prediction,
-                "internal_state": state,
-                "cycle_id": self.counter,
-            }
+            self.engine.workspace = {"input": message, "focus": message, "attention": [asdict(x) for x in ranked], "memories": [m.json() for m in memories], "model": self.engine.model.info(), "metacognition": self.engine.meta, "prediction": self.engine.last_prediction, "internal_state": state, "cycle_id": self.counter}
             await self._phase("workspace", self.engine.workspace)
             await self._phase("memory", {"retrieved": len(memories)})
             await self._phase("self_world", {"self": asdict(self.engine.self_model), "world_entities": len(self.engine.world.snapshot()["entities"])})
             await self._phase("internal_state", {"state": state, "status": self.engine.internal_state.status()})
-            goals = self.engine.goals.active()
-            self.current.active_goal = goals[0] if goals else None
+            goals = self.engine.goals.active(); self.current.active_goal = goals[0] if goals else None
             await self._phase("goal_evaluation", {"active_goals": len(goals), "selected": self.current.active_goal})
             await self._phase("reasoning", {"confidence": self.engine.meta.get("confidence", 0)})
             if self.current.active_goal:
-                plan = self.engine.planner.create(self.current.active_goal["title"])
-                self.current.plan_id = plan["id"]
+                plan = self.engine.planner.create(self.current.active_goal["title"]); self.current.plan_id = plan["id"]
                 await self._phase("planning", {"plan_id": self.current.plan_id, "goal_id": self.current.active_goal["id"]})
-            else:
-                await self._phase("planning", {"plan_id": None, "reason": "no active goal"})
+            else: await self._phase("planning", {"plan_id": None, "reason": "no active goal"})
             await self._phase("safety", self.engine.safety.snapshot())
             await self._phase("execution", {"mode": "approval-gated local simulation", "plan_id": self.current.plan_id})
             response = await self.engine.model.generate(message, [m.content for m in memories])
@@ -85,23 +69,15 @@ class CognitiveLoop:
             saved = self.engine.memory.add("User: " + message + "\nSystem: " + response, kind="episodic", importance=.55, confidence=max(.1, 1-self.engine.internal_state.state.uncertainty), source="conversation")
             self.engine.last_reflection = self.engine.reflection.reflect(message, response, self.engine.memory.count(), self.engine.internal_state.state.uncertainty)
             await self._phase("reflection", asdict(self.engine.last_reflection))
+            learned_items = []
+            for lesson in self.engine.last_reflection.lessons:
+                learned_items.append(self.engine.learning_v2.learn(lesson, "retrieve_then_verify", [f"cycle:{self.counter}"], self.engine.meta.get("confidence", .5), .6, "reflection"))
             learned = self.engine.internal_state.transition(energy_delta=-.01, valence_delta=.01)
-            await self._phase("learning", {"memory_id": saved.id, "lesson_count": len(self.engine.last_reflection.lessons), "state": learned})
+            await self._phase("learning", {"memory_id": saved.id, "lesson_count": len(learned_items), "updates": learned_items, "state": learned})
             await self._phase("consolidation", {"deferred": True, "reason": "consolidation is managed by sleep cycle"})
-            self.current.status = "completed"
-            await self._phase("idle", {"cycle_id": self.counter, "status": "completed"})
-            return {
-                "response": response, "cycle": asdict(self.current),
-                "memories": [m.json() for m in memories], "state": self.engine.internal_state.snapshot(),
-                "workspace": self.engine.workspace, "reflection": asdict(self.engine.last_reflection),
-                "metacognition": self.engine.meta, "prediction": self.engine.last_prediction,
-            }
+            self.current.status = "completed"; await self._phase("idle", {"cycle_id": self.counter, "status": "completed"})
+            return {"response": response, "cycle": asdict(self.current), "memories": [m.json() for m in memories], "state": self.engine.internal_state.snapshot(), "workspace": self.engine.workspace, "reflection": asdict(self.engine.last_reflection), "metacognition": self.engine.meta, "prediction": self.engine.last_prediction, "learning": learned_items}
         except Exception as exc:
-            self.current.status = "failed"
-            self.current.error = str(exc)
-            self.current.updated_at = datetime.now(timezone.utc).isoformat()
-            await self.engine.events.publish(Event("loop.failed", asdict(self.current)))
-            raise
+            self.current.status = "failed"; self.current.error = str(exc); self.current.updated_at = datetime.now(timezone.utc).isoformat(); await self.engine.events.publish(Event("loop.failed", asdict(self.current))); raise
 
-    def snapshot(self):
-        return asdict(self.current)
+    def snapshot(self): return asdict(self.current)
