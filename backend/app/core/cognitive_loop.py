@@ -75,8 +75,26 @@ class CognitiveLoop:
             learned = self.engine.internal_state.transition(energy_delta=-.01, valence_delta=.01)
             await self._phase("learning", {"memory_id": saved.id, "lesson_count": len(learned_items), "updates": learned_items, "state": learned})
             await self._phase("consolidation", {"deferred": True, "reason": "consolidation is managed by sleep cycle"})
-            self.current.status = "completed"; await self._phase("idle", {"cycle_id": self.counter, "status": "completed"})
-            return {"response": response, "cycle": asdict(self.current), "memories": [m.json() for m in memories], "state": self.engine.internal_state.snapshot(), "workspace": self.engine.workspace, "reflection": asdict(self.engine.last_reflection), "metacognition": self.engine.meta, "prediction": self.engine.last_prediction, "learning": learned_items}
+            self.current.status = "completed"
+            self.current.updated_at = datetime.now(timezone.utc).isoformat()
+            episode = self.engine.autobiographical_v2.create(
+                cycle_id=self.counter,
+                title=(self.current.active_goal or {}).get("title", "Cognitive episode"),
+                summary=f"Cycle {self.counter} completed through reflection and bounded learning.",
+                input_text=message,
+                response_summary=response,
+                active_goal_id=(self.current.active_goal or {}).get("id"),
+                plan_id=self.current.plan_id,
+                importance=.55,
+                confidence=self.engine.meta.get("confidence", .5),
+                tags=["cognitive-cycle", "reflection", "learning"],
+                metadata={"memory_id": saved.id, "completed_phases": self.current.completed_phases},
+                started_at=self.current.started_at,
+                ended_at=self.current.updated_at,
+            )
+            await self.engine.events.publish(Event("autobiographical.episode.created", {"cycle_id": self.counter, "episode_id": episode["id"]}))
+            await self._phase("idle", {"cycle_id": self.counter, "status": "completed", "episode_id": episode["id"]})
+            return {"response": response, "cycle": asdict(self.current), "episode": episode, "memories": [m.json() for m in memories], "state": self.engine.internal_state.snapshot(), "workspace": self.engine.workspace, "reflection": asdict(self.engine.last_reflection), "metacognition": self.engine.meta, "prediction": self.engine.last_prediction, "learning": learned_items}
         except Exception as exc:
             self.current.status = "failed"; self.current.error = str(exc); self.current.updated_at = datetime.now(timezone.utc).isoformat(); await self.engine.events.publish(Event("loop.failed", asdict(self.current))); raise
 
