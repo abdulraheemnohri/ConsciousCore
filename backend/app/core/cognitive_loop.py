@@ -56,16 +56,7 @@ class CognitiveLoop:
                 runtime_mode = RuntimeMode(settings.get("runtime_mode", "auto"))
             except ValueError:
                 runtime_mode = RuntimeMode.AUTO
-            runtime_request = RuntimeRequest(
-                prompt=message,
-                mode=runtime_mode,
-                privacy=settings.get("runtime_privacy", "private"),
-                task_type="conversation",
-                require_local_memory=True,
-                allow_cloud=bool(settings.get("allow_cloud_llm", False)),
-                allow_remote=bool(settings.get("allow_remote_llm", False)),
-                metadata={"parallel_strategy": settings.get("parallel_strategy", "judge"), "cycle_id": self.counter},
-            )
+            runtime_request = RuntimeRequest(prompt=message, mode=runtime_mode, privacy=settings.get("runtime_privacy", "private"), task_type="conversation", require_local_memory=True, allow_cloud=bool(settings.get("allow_cloud_llm", False)), allow_remote=bool(settings.get("allow_remote_llm", False)), metadata={"parallel_strategy": settings.get("parallel_strategy", "judge"), "cycle_id": self.counter, "settings": settings})
             self.engine.workspace = {"input": message, "focus": message, "attention": [asdict(x) for x in ranked], "memories": [m.json() for m in memories], "model": self.engine.model.info(), "metacognition": self.engine.meta, "prediction": self.engine.last_prediction, "internal_state": state, "cycle_id": self.counter, "runtime_request": {"mode": runtime_request.mode.value, "privacy": runtime_request.privacy, "allow_cloud": runtime_request.allow_cloud, "allow_remote": runtime_request.allow_remote}}
             await self._phase("workspace", self.engine.workspace)
             await self._phase("memory", {"retrieved": len(memories), "federation": "local-first"})
@@ -93,8 +84,7 @@ class CognitiveLoop:
             learned = self.engine.internal_state.transition(energy_delta=-.01, valence_delta=.01)
             await self._phase("learning", {"memory_id": saved.id, "lesson_count": len(learned_items), "updates": learned_items, "state": learned})
             await self._phase("consolidation", {"deferred": True, "reason": "consolidation is managed by sleep cycle"})
-            self.current.status = "completed"
-            self.current.updated_at = datetime.now(timezone.utc).isoformat()
+            self.current.status = "completed"; self.current.updated_at = datetime.now(timezone.utc).isoformat()
             episode = self.engine.autobiographical_v2.create(cycle_id=self.counter, title=(self.current.active_goal or {}).get("title", "Cognitive episode"), summary=f"Cycle {self.counter} completed through reflection and bounded learning.", input_text=message, response_summary=response, active_goal_id=(self.current.active_goal or {}).get("id"), plan_id=self.current.plan_id, importance=.55, confidence=self.engine.meta.get("confidence", .5), tags=["cognitive-cycle", "reflection", "learning"], metadata={"memory_id": saved.id, "completed_phases": self.current.completed_phases, "runtime_provider": runtime_result.provider, "runtime_mode": runtime_result.mode}, started_at=self.current.started_at, ended_at=self.current.updated_at)
             await self.engine.events.publish(Event("autobiographical.episode.created", {"cycle_id": self.counter, "episode_id": episode["id"]}))
             await self._phase("idle", {"cycle_id": self.counter, "status": "completed", "episode_id": episode["id"]})
