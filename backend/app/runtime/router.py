@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any, Callable
 
 from .policy import classify
@@ -15,7 +15,7 @@ class Route:
 
 
 class RuntimeRouter:
-    """Policy-first runtime selector. It never sends data remotely by accident."""
+    """Policy-first runtime selector. Remote execution is opt-in."""
 
     def __init__(self) -> None:
         self.providers: dict[str, dict[str, Any]] = {
@@ -34,18 +34,18 @@ class RuntimeRouter:
         boundary = classify(request.prompt, request.privacy)
         mode = request.mode
         if mode == RuntimeMode.AUTO:
-            if boundary.classification in {"sensitive", "secret"} or request.require_local_memory:
+            if boundary.classification in {"sensitive", "secret"}:
                 mode = RuntimeMode.HYBRID if request.allow_remote and boundary.remote_allowed else RuntimeMode.LOCAL
-            elif request.allow_cloud and boundary.cloud_allowed:
+            elif request.allow_cloud and boundary.cloud_allowed and self.providers.get("cloud", {}).get("enabled"):
                 mode = RuntimeMode.CLOUD
-            elif request.allow_remote and boundary.remote_allowed:
+            elif request.allow_remote and boundary.remote_allowed and self.providers.get("remote", {}).get("enabled"):
                 mode = RuntimeMode.REMOTE
             else:
                 mode = RuntimeMode.LOCAL
 
-        if mode == RuntimeMode.CLOUD and not (request.allow_cloud and boundary.cloud_allowed):
+        if mode == RuntimeMode.CLOUD and not (request.allow_cloud and boundary.cloud_allowed and self.providers.get("cloud", {}).get("enabled")):
             mode = RuntimeMode.LOCAL
-        if mode == RuntimeMode.REMOTE and not (request.allow_remote and boundary.remote_allowed):
+        if mode == RuntimeMode.REMOTE and not (request.allow_remote and boundary.remote_allowed and self.providers.get("remote", {}).get("enabled")):
             mode = RuntimeMode.LOCAL
 
         if mode == RuntimeMode.HYBRID:
@@ -56,11 +56,8 @@ class RuntimeRouter:
                 routes.append(Route("remote", self._first_model("remote"), "remote generation allowed by boundary policy"))
             return routes
 
-        if mode == RuntimeMode.PARALLEL:
-            return [Route(p, self._first_model(p), "parallel candidate") for p in self._available_candidates(request, boundary)]
-
-        if mode == RuntimeMode.DISTRIBUTED:
-            return [Route(p, self._first_model(p), "distributed candidate") for p in self._available_candidates(request, boundary)]
+        if mode in {RuntimeMode.PARALLEL, RuntimeMode.DISTRIBUTED}:
+            return [Route(p, self._first_model(p), f"{mode.value} candidate") for p in self._available_candidates(request, boundary)]
 
         provider = mode.value
         return [Route(provider, self._first_model(provider), f"explicit runtime mode: {mode.value}")]
@@ -72,7 +69,7 @@ class RuntimeRouter:
             "classification": boundary.classification,
             "cloud_allowed": boundary.cloud_allowed and request.allow_cloud,
             "remote_allowed": boundary.remote_allowed and request.allow_remote,
-            "routes": [route.__dict__ for route in routes],
+            "routes": [asdict(route) for route in routes],
             "reasons": boundary.reasons,
         }
 
