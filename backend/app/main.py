@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel,Field
 from .core.engine import CognitiveEngine
 from .database import db
-VERSION="2.5.0"; app=FastAPI(title="ConsciousCore",version=VERSION)
+VERSION="2.6.0"; app=FastAPI(title="ConsciousCore",version=VERSION)
 origins=[x.strip() for x in os.getenv("CONSCIOUSCORE_CORS","http://127.0.0.1:5173,http://localhost:5173").split(",") if x.strip()]; app.add_middleware(CORSMiddleware,allow_origins=origins,allow_methods=["*"],allow_headers=["*"]); engine=CognitiveEngine()
 class Chat(BaseModel): message:str=Field(min_length=1,max_length=20000)
 class StateTransition(BaseModel): uncertainty:float|None=Field(default=None,ge=0,le=1); energy_delta:float=Field(default=0,ge=-1,le=1); valence_delta:float=Field(default=0,ge=-1,le=1)
@@ -28,6 +28,7 @@ class WorkspaceCandidateInput(BaseModel): source:str=Field(min_length=1,max_leng
 class WorkspaceBroadcastInput(BaseModel): candidate_id:str|None=None; approved:bool=False
 class WorkspaceInterruptInput(BaseModel): reason:str=Field(default="higher-priority candidate",max_length=500)
 class WorkspaceSubscriptionInput(BaseModel): module_name:str=Field(min_length=1,max_length=100)
+class EventTimelineInput(BaseModel): event_type:str|None=None; phase:str|None=None; source:str|None=None; cycle_id:str|None=None; limit:int=100; before:float|None=None; after:float|None=None
 class ToolInput(BaseModel): name:str; description:str; risk:float=Field(default=.5,ge=0,le=1)
 class ActionCheck(BaseModel): action:str; risk:float=Field(default=.5,ge=0,le=1)
 class ModelRegister(BaseModel): model_id:str=Field(min_length=1,max_length=200); path:str=Field(min_length=1,max_length=2000); context_size:int=Field(default=4096,ge=256,le=131072); n_threads:int|None=Field(default=None,ge=1,le=256); n_gpu_layers:int=Field(default=0,ge=0,le=999)
@@ -107,6 +108,17 @@ async def workspace_history(limit:int=50): return {"items":engine.global_workspa
 async def workspace_subscribe(body:WorkspaceSubscriptionInput): return engine.global_workspace_v2.subscribe(body.module_name)
 @app.delete("/api/workspace/v2/subscribe/{module}")
 async def workspace_unsubscribe(module:str): return engine.global_workspace_v2.unsubscribe(module)
+@app.get("/api/events/v2")
+async def events_v2(q:EventTimelineInput=__import__('fastapi').Query(default_factory=EventTimelineInput)):
+    return {"items":engine.events.query(cycle_id=q.cycle_id,phase=q.phase,source=q.source,event_type=q.event_type,limit=q.limit,before=q.before,after=q.after),"stats":engine.events.stats()}
+@app.get("/api/events/v2/timeline")
+async def events_timeline(cycle_id:str|None=None,phase:str|None=None,source:str|None=None,event_type:str|None=None,limit:int=100): return {"items":engine.events.timeline(max(1,min(limit,1000)),cycle_id) if not any((phase,source,event_type)) else list(reversed(engine.events.query(cycle_id=cycle_id,phase=phase,source=source,event_type=event_type,limit=max(1,min(limit,1000)))))}
+@app.get("/api/events/v2/cycle/{cycle_id}")
+async def events_cycle(cycle_id:str,limit:int=500): return {"cycle_id":cycle_id,"items":engine.events.by_cycle(cycle_id,max(1,min(limit,1000)))}
+@app.get("/api/events/v2/phase/{phase}")
+async def events_phase(phase:str,limit:int=100): return {"phase":phase,"items":engine.events.by_phase(phase,max(1,min(limit,1000)))}
+@app.get("/api/events/v2/stats")
+async def events_stats(): return engine.events.stats()
 @app.get("/api/metacognition")
 async def metacognition(): return engine.meta
 @app.get("/api/prediction")
