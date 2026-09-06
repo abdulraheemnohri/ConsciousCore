@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel,Field
 from .core.engine import CognitiveEngine
 from .database import db
-VERSION="2.0.0"; app=FastAPI(title="ConsciousCore",version=VERSION)
+VERSION="2.1.0"; app=FastAPI(title="ConsciousCore",version=VERSION)
 origins=[x.strip() for x in os.getenv("CONSCIOUSCORE_CORS","http://127.0.0.1:5173,http://localhost:5173").split(",") if x.strip()]; app.add_middleware(CORSMiddleware,allow_origins=origins,allow_methods=["*"],allow_headers=["*"]); engine=CognitiveEngine()
 class Chat(BaseModel): message:str=Field(min_length=1,max_length=20000)
 class MemoryInput(BaseModel): content:str=Field(min_length=1,max_length=50000); kind:str="semantic"; importance:float=Field(default=.5,ge=0,le=1); confidence:float=Field(default=.7,ge=0,le=1); tags:list[str]=Field(default_factory=list); source:str="user"
@@ -29,6 +29,11 @@ async def health(): return {"ok":True,"service":"ConsciousCore","version":VERSIO
 async def state(): return engine.snapshot()
 @app.post("/api/chat")
 async def chat(body:Chat): return await engine.process(body.message)
+@app.get("/api/loop")
+async def loop_state(): return engine.loop.snapshot()
+@app.post("/api/loop/run")
+async def run_loop(body:Chat):
+    result=await engine.process(body.message); audit("loop.completed",{"cycle_id":result["cycle"]["cycle_id"]}); return result
 @app.get("/api/memory")
 async def memories(q:str="",limit:int=20,kind:str|None=None,consolidated:bool|None=None): limit=max(1,min(limit,1000)); return {"items":[m.json() for m in engine.memory.search(q,limit,kind,consolidated)],"stats":engine.memory.stats()}
 @app.get("/api/memory/stats")
