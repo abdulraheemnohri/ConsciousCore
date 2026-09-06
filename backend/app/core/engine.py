@@ -35,6 +35,20 @@ class CognitiveEngine:
         self.execution = ExecutionEngine(self.planner, self.safety, self.memory); self.internal_state = InternalStateEngine(); self.self_model_v2 = SelfModelEngine(); self.learning_v2 = LearningEngineV2(); self.autobiographical_v2 = AutobiographicalMemoryV2()
         self.global_workspace_v2 = GlobalWorkspaceV2(self.events)
         self.state = self.internal_state.state; self.self_model = SelfModel(); self.workspace = {}; self.last_reflection = None; self.last_prediction = None; self.meta = {}; self.loop = CognitiveLoop(self)
+        self._register_runtime_extensions()
+
+    def _register_runtime_extensions(self):
+        """Attach optional FastAPI routes when the engine is constructed by app.main.
+        Core remains usable independently in tests and CLI processes."""
+        try:
+            import inspect
+            app = inspect.currentframe().f_back.f_globals.get("app")
+            if app is not None and hasattr(app, "include_router"):
+                from .autobiographical_api import create_router
+                if not any(getattr(r, "path", "").startswith("/api/autobiographical/v2") for r in app.routes):
+                    app.include_router(create_router(self))
+        except Exception:
+            pass
 
     def activate_model(self, model_id: str):
         info = self.model_manager.activate(model_id); self.model = self.model_manager.get_active(); return info
