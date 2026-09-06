@@ -7,7 +7,7 @@ from .planner import Planner
 from .reflection import ReflectionEngine
 from .metacognition import Metacognition
 from .prediction import PredictionEngine
-from .world_model import WorldModel
+from .world_model_v2 import WorldModelV2
 from .safety import SafetyEngine
 from .tools import ToolRegistry
 from .sleep import SleepConsolidator
@@ -27,7 +27,7 @@ class CognitiveEngine:
         self.model_manager = ModelManager(); self.model_manager.discover_gguf()
         self.model = model or self.model_manager.get_active() or FallbackModel()
         self.memory = MemoryStore(); self.events = EventBus(); self.attention = AttentionEngine(); self.goals = GoalManager(); self.planner = Planner(); self.reflection = ReflectionEngine()
-        self.metacognition = Metacognition(); self.prediction = PredictionEngine(); self.world = WorldModel(); self.safety = SafetyEngine(1); self.tools = ToolRegistry(self.safety); self.sleep = SleepConsolidator(self.memory)
+        self.metacognition = Metacognition(); self.prediction = PredictionEngine(); self.world = WorldModelV2(); self.safety = SafetyEngine(1); self.tools = ToolRegistry(self.safety); self.sleep = SleepConsolidator(self.memory)
         self.execution = ExecutionEngine(self.planner, self.safety, self.memory); self.internal_state = InternalStateEngine(); self.self_model_v2 = SelfModelEngine()
         self.state = self.internal_state.state; self.self_model = SelfModel(); self.workspace = {}; self.last_reflection = None; self.last_prediction = None; self.meta = {}; self.loop = CognitiveLoop(self)
 
