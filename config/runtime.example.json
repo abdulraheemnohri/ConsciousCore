@@ -1,0 +1,43 @@
+{
+  "mode": "auto",
+  "local": {
+    "enabled": true,
+    "models": []
+  },
+  "cloud": {
+    "enabled": false,
+    "provider": "",
+    "models": [],
+    "base_url": "",
+    "api_key_env": ""
+  },
+  "remote": {
+    "enabled": false,
+    "name": "home-ai-server",
+    "base_url": "http://127.0.0.1:11434",
+    "protocol": "ollama",
+    "models": [],
+    "api_key_env": ""
+  },
+  "parallel": {
+    "enabled": false,
+    "providers": ["local", "remote", "cloud"],
+    "strategy": "judge"
+  },
+  "memory": {
+    "local": true,
+    "cloud": false,
+    "remote": false,
+    "replication": "local-only"
+  },
+  "privacy": {
+    "default_classification": "private",
+    "block_secrets_from_remote": true,
+    "redact_detected_secrets": true
+  },
+  "telemetry": {
+    "enabled": false,
+    "remote": false,
+    "local_diagnostics": true
+  }
+}
