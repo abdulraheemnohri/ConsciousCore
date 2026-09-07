@@ -263,7 +263,7 @@ class GoalManager:
             raise ValueError(f"invalid_goal_status:{status}")
         
         p = max(0, min(1, progress)) if progress is not None else goal.progress
-        s = status or goal.status
+        s = status if status is not None else goal.status
         if p >= 1:
             s = GoalStatus.COMPLETED.value
         
@@ -278,12 +278,9 @@ class GoalManager:
         if description is not None:
             updates.append("description=?")
             params.append(description)
-        if progress is not None:
+        if progress is not None or status is not None:
             updates.append("progress=?")
             params.append(p)
-            updates.append("status=?")
-            params.append(s)
-        elif status is not None:
             updates.append("status=?")
             params.append(s)
         if priority is not None:
