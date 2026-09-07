@@ -1,133 +1,232 @@
-# ConsciousCore
+# ConsciousCore V1
 
-**Persistent Memory · Self Model · World Model · Global Workspace · Reflection · Learning · Autobiographical Timeline · Local/Cloud/Remote/Hybrid/Parallel Runtime**
+**Local-First Universal Cognitive Operating Layer**
 
-ConsciousCore is a local-first, consciousness-inspired cognitive operating layer for AI systems. It combines persistent memory, attention, global-workspace coordination, internal computational state, goals, planning, safety, prediction, metacognition, reflection, bounded learning, event history, autobiographical-style episode storage, and pluggable model/runtime inference.
+> **Tagline:** Persistent Memory. Self Model. Attention. Reflection. One Continuous Cognitive System.
 
-> **Scientific boundary:** ConsciousCore does not claim to create subjective consciousness, sentience, qualia, or proof of experience. Self-model, internal-state, reflection, global-workspace, and autobiographical terms describe engineered computational mechanisms.
+---
 
-## Runtime architecture
+## Scientific Position & Identity
 
-ConsciousCore now defines a provider-neutral runtime layer for:
+> ⚠️ **Scientific Position:** ConsciousCore **MUST NOT** claim to be genuinely conscious, sentient, self-aware in the phenomenal sense, or capable of subjective experience.
+>
+> ConsciousCore is defined scientifically as a **"consciousness-inspired cognitive architecture"** or **"functional cognitive continuity layer."**
+>
+> The system models functions commonly associated with consciousness research—attention, working memory, self-modeling, global workspace, reflection, prediction, goal management, metacognition, and continuity—without asserting subjective experience.
 
-- **Solo Local** — local model + local cognitive state
-- **Solo Cloud** — optional cloud model execution
-- **Solo Remote** — self-hosted model server
-- **Hybrid** — local cognitive state with optional cloud/remote generation
-- **Parallel** — multiple enabled providers can produce candidate results
-- **Distributed** — multiple runtime nodes can participate
-- **Auto** — policy selects a safe route based on privacy and availability
+---
 
-The runtime is intentionally separate from the cognitive state. Models provide generation/embedding/vision capabilities; ConsciousCore owns continuity, memory, workspace, goals, self/world models, safety, reflection and learning.
+## Product Vision & Principles
 
-## Privacy boundary
+ConsciousCore sits above AI models and below applications/tools. The AI model is **replaceable**; ConsciousCore owns the persistent functional state and cognitive orchestration.
 
-Data is classified as `public`, `internal`, `private`, `sensitive`, or `secret`. Remote/cloud execution is opt-in and policy checked. Secret-like material is blocked from cloud routing and can be redacted before remote use. Local-only operation remains the default.
+### Core Principles
+1. **Local-First & Offline Capable:** Complete processing on local device/server with fallback options.
+2. **Privacy & Data Boundary Protection:** Automatic classification (`PUBLIC`, `INTERNAL`, `PRIVATE`, `SENSITIVE`, `SECRET`) and local secret redaction.
+3. **Model Independence:** Replaceable local, cloud, remote, or parallel model backends (Ollama, vLLM, llama.cpp, GGUF, OpenAI-compatible).
+4. **Observable Cognition:** Transparent Global Workspace V2, decision summaries, and execution inspection.
+5. **Bounded Autonomy & Safety:** Immutable safety rules, approval-gated actions, no secret extraction or silent remote exfiltration.
 
-## Memory federation
+---
 
-Memory can be configured as local-only, local+remote, local+cloud, or other explicitly selected replication policies. Future sync services can use the runtime contracts without coupling the cognitive engine to one vendor.
+## Fundamental Architecture
 
-## Telemetry
-
-Remote telemetry is disabled by default. Local diagnostics may remain enabled for CPU/RAM/GPU, latency, errors and subsystem health. No cloud telemetry is required for core operation.
-
-## Implemented architecture
-
-```text
-Input
- → Perception
- → Attention
- → Global Workspace V2
- → Memory Retrieval
- → Self Model V2 / World Model V2
- → Internal State V3
- → Goal Evaluation
- → Runtime Selection
- → Local / Cloud / Remote / Hybrid / Parallel
- → Reasoning / Model
- → Planning
- → Safety + Approval Gate
- → Local Simulation / Response
- → Observation
- → Reflection
- → Learning V2
- → Memory Consolidation
- → Autobiographical Memory V2
- → Cognitive Event Bus V2
- → Loop
+```
+                    USER / APPLICATION
+                           │
+                           ▼
+                     PERCEPTION
+                           │
+                           ▼
+                  EVENT NORMALIZATION
+                           │
+                           ▼
+                  GLOBAL WORKSPACE
+                           │
+             ┌─────────────┴─────────────┐
+             ▼                           ▼
+         ATTENTION                  INTERNAL STATE
+             │                           │
+             └─────────────┬─────────────┘
+                           ▼
+                    MEMORY ROUTER
+                           │
+        ┌──────────────────┼──────────────────┐
+        ▼                  ▼                  ▼
+   LOCAL MEMORY       CLOUD MEMORY       REMOTE MEMORY
+        │                  │                  │
+        └──────────────────┼──────────────────┘
+                           ▼
+                      SELF MODEL
+                           │
+                           ▼
+                      WORLD MODEL
+                           │
+                           ▼
+                     GOAL EVALUATION
+                           │
+                           ▼
+                       REASONING
+                           │
+                           ▼
+                       PLANNING
+                           │
+                           ▼
+                    MODEL ORCHESTRATOR
+                           │
+        ┌──────────────────┼──────────────────┐
+        ▼                  ▼                  ▼
+      LOCAL              CLOUD              REMOTE
+        │                  │                  │
+        └──────────────────┼──────────────────┘
+                           ▼
+                      SAFETY ENGINE
+                           │
+                           ▼
+                     TOOL EXECUTION
+                           │
+                           ▼
+                      OBSERVATION
+                           │
+                           ▼
+                      REFLECTION
+                           │
+                           ▼
+                       LEARNING
+                           │
+                           ▼
+                  MEMORY CONSOLIDATION
+                           │
+                           ▼
+                    STATE UPDATE
+                           │
+                           └──────────► NEXT CYCLE
 ```
 
-## Core features
+---
 
-- FastAPI local runtime + SQLite persistence
-- Observable cognitive loop with cycle IDs
-- Typed persistent memory with importance/confidence, retrieval, update/delete and consolidation
-- Attention ranking and metacognitive confidence/uncertainty
-- Global Workspace V2 with candidate competition, winner selection, broadcast, interruption and subscriptions
-- World Model V2 with entities, properties, temporal relations, events, beliefs, history, queries and contradiction detection
-- Goals and persistent plans with step dependencies and lifecycle controls
-- Reflection and bounded Learning V2 with lessons, strategies, evidence and recommendations
-- Cognitive Event Bus V2 with persistent timeline, filters, cycle/phase queries, correlation IDs and parent IDs
-- Autobiographical Memory V2 with episodes, timeline, search, archive, statistics and links to cycles/plans/reflections/learning
-- Self Model V2 with capabilities, limitations, autonomy and explicit scientific boundaries
-- Internal computational state with energy, arousal, attention load, stress, uncertainty, confidence and stability
-- Safety engine with autonomy levels 0–3 and approval-gated execution
-- Prohibited actions: authentication bypass, secret extraction, credential capture, MFA/CAPTCHA bypass and destructive system changes
-- Local GGUF model manager and optional llama.cpp adapter
-- Deterministic fallback model when no local model is available
-- Provider-neutral runtime router for local/cloud/remote/hybrid/parallel/distributed modes
-- Privacy-aware data boundary classification
-- Persistent runtime settings and immutable safety invariants
-- WebSocket event stream
-- Audit log
-- Responsive frontend control center
+## UI Control Center & Screenshots
 
-## Runtime configuration
+ConsciousCore V1 provides a comprehensive React + TypeScript Control Center with 28 specialized UI pages and `Ctrl+K` Command Palette navigation.
 
-Copy `config/runtime.example.json` to a private runtime configuration file and adjust it for your deployment. Do not commit real API keys or credentials. Prefer environment variables for secrets.
+### Core Workspace
+| Page | Preview |
+| --- | --- |
+| **Dashboard** | ![Dashboard](assets/screenshots/dashboard.png) |
+| **Chat Workspace** | ![Chat Workspace](assets/screenshots/chat_workspace.png) |
+| **Global Workspace V2** | ![Global Workspace](assets/screenshots/global_workspace.png) |
+| **Attention Center** | ![Attention Center](assets/screenshots/attention_center.png) |
 
-## Run locally
+---
 
+### Memory & State Management
+| Page | Preview |
+| --- | --- |
+| **Memory Center** | ![Memory Center](assets/screenshots/memory.png) |
+| **Memory Federation & Sync** | ![Memory Federation](assets/screenshots/memory_federation.png) |
+| **Self Model V2** | ![Self Model](assets/screenshots/self_model.png) |
+| **World Model V2** | ![World Model](assets/screenshots/world_model.png) |
+| **Internal Computational State** | ![Internal State](assets/screenshots/internal_state.png) |
+
+---
+
+### Planning, Reasoning & Cognition
+| Page | Preview |
+| --- | --- |
+| **Goals Engine** | ![Goals Engine](assets/screenshots/goals.png) |
+| **Planner & Kanban** | ![Planner](assets/screenshots/planner.png) |
+| **Reasoning Center** | ![Reasoning Center](assets/screenshots/reasoning.png) |
+| **Reflection Engine** | ![Reflection Engine](assets/screenshots/reflection.png) |
+| **Metacognition** | ![Metacognition](assets/screenshots/metacognition.png) |
+| **Prediction Engine** | ![Prediction Engine](assets/screenshots/prediction.png) |
+| **Simulation Sandbox** | ![Simulation Sandbox](assets/screenshots/simulation.png) |
+| **Sleep / Consolidation** | ![Sleep Maintenance](assets/screenshots/sleep.png) |
+
+---
+
+### Runtime & AI Engine
+| Page | Preview |
+| --- | --- |
+| **Runtime Center** | ![Runtime Center](assets/screenshots/runtime_center.png) |
+| **Model Manager** | ![Model Manager](assets/screenshots/models.png) |
+| **Parallel AI Strategies** | ![Parallel AI](assets/screenshots/parallel_ai.png) |
+| **Distributed Nodes** | ![Distributed Nodes](assets/screenshots/distributed_nodes.png) |
+
+---
+
+### System, Safety & Operations
+| Page | Preview |
+| --- | --- |
+| **Tool Center** | ![Tool Center](assets/screenshots/tools.png) |
+| **Safety Engine & Approvals** | ![Safety Center](assets/screenshots/safety.png) |
+| **Telemetry Center** | ![Telemetry Center](assets/screenshots/telemetry.png) |
+| **Analytics** | ![Analytics](assets/screenshots/analytics.png) |
+| **System Audit Logs** | ![System Logs](assets/screenshots/logs.png) |
+| **Developer Console** | ![Developer Console](assets/screenshots/developer_console.png) |
+| **Settings Center** | ![Settings](assets/screenshots/settings.png) |
+
+---
+
+## Universal Runtime Modes
+
+- **Local:** On-device model, memory, safety, and tools.
+- **Cloud:** Disabled by default; policy-gated generation.
+- **Remote:** Connects to Ollama, vLLM, llama.cpp, TGI, or custom remote endpoints.
+- **Hybrid (Recommended):** Local memory, workspace, safety, self-model + Remote specialist inference.
+- **Parallel:** Concurrent execution using **Race**, **Judge**, **Consensus**, **Specialist**, or **Debate** strategies.
+- **Distributed:** Multi-node coordination with memory replication and workload distribution.
+
+---
+
+## Memory System & Federation
+
+ConsciousCore manages 7 distinct memory types:
+1. **Working Memory:** Active context budget.
+2. **Episodic Memory:** Specific cognitive experiences.
+3. **Semantic Memory:** Knowledge and factual network.
+4. **Procedural Memory:** Skills, workflows, and procedures.
+5. **Self Memory:** Functional self-model state.
+6. **Meta Memory:** Uncertainty, reliability, and error history.
+7. **Autobiographical Memory:** Timeline of cognitive episodes.
+
+---
+
+## Quick Start & Installation
+
+### Prerequisites
+- Python 3.12+
+- Node.js 18+
+- SQLite3
+
+### Backend Setup
 ```bash
 cd backend
-python -m venv .venv
-# Windows PowerShell
-.venv\\Scripts\\Activate.ps1
-# Linux/macOS
-# source .venv/bin/activate
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+uvicorn app.main:app --reload --port 8000
 ```
 
-SQLite is created automatically at `data/consciouscore.db` by default. Set `CONSCIOUSCORE_DB` for another local path.
-
-Frontend:
-
+### Frontend Setup
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-Set `VITE_API_URL` when the backend is not on `http://127.0.0.1:8000`.
+Open `http://localhost:5173` in your browser. Use `Ctrl + K` to open the Command Palette.
 
-## Testing
+---
 
-```bash
-cd backend
-PYTHONPATH=. pytest -q
-```
+## API & Documentation
 
-The runtime routing tests cover secret blocking, local fallback, hybrid routing and parallel candidates.
+Interactive API documentation is generated automatically by FastAPI:
+- **Swagger UI:** `http://localhost:8000/docs`
+- **ReDoc:** `http://localhost:8000/redoc`
+- **OpenAPI Schema:** `http://localhost:8000/openapi.json`
 
-## Safety and autonomy
+---
 
-- Local-first by default
-- No cloud inference is required by the architecture
-- External actions require explicit approval
-- Execution engine is a local simulation/state-transition layer unless a future, separately approved integration is added
-- No password, OTP, cookie or session-token extraction
-- No authentication, MFA or CAPTCHA bypass
-- No unrestricted self-modifying source code
-- Learning changes bounded memory/strategy/configuration, not model weights automatically
+## License
+
+ConsciousCore V1 is released under the Apache 2.0 License.
