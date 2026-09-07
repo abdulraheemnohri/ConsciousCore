@@ -1,0 +1,7 @@
+{
+  "system": "ConsciousCore Native Engine",
+  "version": "1.0.0",
+  "mode": "NATIVE_ONLY",
+  "deterministic": true,
+  "supported_languages": ["en", "ur", "roman_urdu"]
+}

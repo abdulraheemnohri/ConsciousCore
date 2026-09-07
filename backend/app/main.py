@@ -1,235 +1,388 @@
-import os,json
+import os, json
 from dataclasses import asdict
-from datetime import datetime,timezone
-from fastapi import FastAPI,WebSocket,HTTPException
+from datetime import datetime, timezone
+from fastapi import FastAPI, WebSocket, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel,Field
+from pydantic import BaseModel, Field
+
 from .core.engine import CognitiveEngine
+from .core.skills_engine import SkillsEngine, Skill
+from .core.learning_engine import LearningEngine
+from .core.ai_network import AINetworkBus
+from .core.code_lab import CodeLab
+from .core.diagnostics import DiagnosticsEngine
 from .database import db
-VERSION="2.6.0"; app=FastAPI(title="ConsciousCore",version=VERSION)
-origins=[x.strip() for x in os.getenv("CONSCIOUSCORE_CORS","http://127.0.0.1:5173,http://localhost:5173").split(",") if x.strip()]; app.add_middleware(CORSMiddleware,allow_origins=origins,allow_methods=["*"],allow_headers=["*"]); engine=CognitiveEngine()
-class Chat(BaseModel): message:str=Field(min_length=1,max_length=20000)
-class StateTransition(BaseModel): uncertainty:float|None=Field(default=None,ge=0,le=1); energy_delta:float=Field(default=0,ge=-1,le=1); valence_delta:float=Field(default=0,ge=-1,le=1)
-class StateRecovery(BaseModel): amount:float=Field(default=.1,ge=0,le=1)
-class SelfModelUpdate(BaseModel): role:str|None=Field(default=None,max_length=200); autonomy_level:int|None=Field(default=None,ge=0,le=3)
-class MemoryInput(BaseModel): content:str=Field(min_length=1,max_length=50000); kind:str="semantic"; importance:float=Field(default=.5,ge=0,le=1); confidence:float=Field(default=.7,ge=0,le=1); tags:list[str]=Field(default_factory=list); source:str="user"
-class MemoryUpdate(BaseModel): kind:str|None=None; importance:float|None=Field(default=None,ge=0,le=1); confidence:float|None=Field(default=None,ge=0,le=1); tags:list[str]|None=None; source:str|None=None; consolidated:bool|None=None
-class Goal(BaseModel): title:str=Field(min_length=1,max_length=500); priority:float=Field(default=.5,ge=0,le=1)
-class GoalUpdate(BaseModel): progress:float|None=Field(default=None,ge=0,le=1); status:str|None=None; priority:float|None=Field(default=None,ge=0,le=1)
-class PlanRequest(BaseModel): goal:str=Field(min_length=1,max_length=1000); constraints:list[str]=Field(default_factory=list)
-class PlanStepUpdate(BaseModel): status:str
-class ExecutionRequest(BaseModel): risk:float=Field(default=.5,ge=0,le=1); approved:bool=False
-class EntityInput(BaseModel): id:str=Field(min_length=1,max_length=200); label:str=Field(min_length=1,max_length=500); kind:str="concept"; properties:dict={}; confidence:float=Field(default=.5,ge=0,le=1)
-class EntityUpdate(BaseModel): label:str|None=None; kind:str|None=None; properties:dict|None=None; confidence:float|None=Field(default=None,ge=0,le=1); active:bool|None=None
-class RelationInput(BaseModel): source:str; relation:str; target:str; confidence:float=Field(default=.5,ge=0,le=1); valid_from:str|None=None; valid_to:str|None=None; properties:dict={}
-class EventInput(BaseModel): event_type:str; entity_ids:list[str]=[]; payload:dict={}; timestamp:str|None=None; source:str="system"
-class BeliefInput(BaseModel): statement:str=Field(min_length=1,max_length=5000); confidence:float=Field(default=.5,ge=0,le=1); evidence_refs:list[str]=[]; status:str="uncertain"
-class WorkspaceCandidateInput(BaseModel): source:str=Field(min_length=1,max_length=100); content:str=Field(min_length=1,max_length=20000); salience:float=Field(default=.5,ge=0,le=1); confidence:float=Field(default=.5,ge=0,le=1); urgency:float=Field(default=.5,ge=0,le=1); novelty:float=Field(default=.5,ge=0,le=1); relevance:float=Field(default=.5,ge=0,le=1); ttl:float=Field(default=30,ge=0,le=86400)
-class WorkspaceBroadcastInput(BaseModel): candidate_id:str|None=None; approved:bool=False
-class WorkspaceInterruptInput(BaseModel): reason:str=Field(default="higher-priority candidate",max_length=500)
-class WorkspaceSubscriptionInput(BaseModel): module_name:str=Field(min_length=1,max_length=100)
-class EventTimelineInput(BaseModel): event_type:str|None=None; phase:str|None=None; source:str|None=None; cycle_id:str|None=None; limit:int=100; before:float|None=None; after:float|None=None
-class ToolInput(BaseModel): name:str; description:str; risk:float=Field(default=.5,ge=0,le=1)
-class ActionCheck(BaseModel): action:str; risk:float=Field(default=.5,ge=0,le=1)
-class ModelRegister(BaseModel): model_id:str=Field(min_length=1,max_length=200); path:str=Field(min_length=1,max_length=2000); context_size:int=Field(default=4096,ge=256,le=131072); n_threads:int|None=Field(default=None,ge=1,le=256); n_gpu_layers:int=Field(default=0,ge=0,le=999)
-class ModelActivate(BaseModel): model_id:str=Field(min_length=1,max_length=200)
-def audit(event_type,payload): db.execute("INSERT INTO audit_logs(event_type,payload,created_at) VALUES(?,?,?)",(event_type,json.dumps(payload),datetime.now(timezone.utc).isoformat()))
+
+VERSION = "1.0.0"
+app = FastAPI(title="ConsciousCore V1", version=VERSION)
+
+origins = [x.strip() for x in os.getenv("CONSCIOUSCORE_CORS", "http://127.0.0.1:5173,http://localhost:5173").split(",") if x.strip()]
+app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["*"], allow_headers=["*"])
+
+engine = CognitiveEngine()
+skills_engine = SkillsEngine()
+learning_engine = LearningEngine()
+ai_network_bus = AINetworkBus()
+code_lab = CodeLab()
+
+class Chat(BaseModel): message: str = Field(min_length=1, max_length=20000)
+class StateTransition(BaseModel): uncertainty: float | None = Field(default=None, ge=0, le=1); energy_delta: float = Field(default=0, ge=-1, le=1); valence_delta: float = Field(default=0, ge=-1, le=1)
+class StateRecovery(BaseModel): amount: float = Field(default=.1, ge=0, le=1)
+class SelfModelUpdate(BaseModel): role: str | None = Field(default=None, max_length=200); autonomy_level: int | None = Field(default=None, ge=0, le=3)
+class MemoryInput(BaseModel): content: str = Field(min_length=1, max_length=50000); kind: str = "semantic"; importance: float = Field(default=.5, ge=0, le=1); confidence: float = Field(default=.7, ge=0, le=1); tags: list[str] = Field(default_factory=list); source: str = "user"
+class MemoryUpdate(BaseModel): kind: str | None = None; importance: float | None = Field(default=None, ge=0, le=1); confidence: float | None = Field(default=None, ge=0, le=1); tags: list[str] | None = None; source: str | None = None; consolidated: bool | None = None
+class Goal(BaseModel): title: str = Field(min_length=1, max_length=500); priority: float = Field(default=.5, ge=0, le=1)
+class GoalUpdate(BaseModel): progress: float | None = Field(default=None, ge=0, le=1); status: str | None = None; priority: float | None = Field(default=None, ge=0, le=1)
+class PlanRequest(BaseModel): goal: str = Field(min_length=1, max_length=1000); constraints: list[str] = Field(default_factory=list)
+class PlanStepUpdate(BaseModel): status: str
+class ExecutionRequest(BaseModel): risk: float = Field(default=.5, ge=0, le=1); approved: bool = False
+class EntityInput(BaseModel): id: str = Field(min_length=1, max_length=200); label: str = Field(min_length=1, max_length=500); kind: str = "concept"; properties: dict = {}; confidence: float = Field(default=.5, ge=0, le=1)
+class EntityUpdate(BaseModel): label: str | None = None; kind: str | None = None; properties: dict | None = None; confidence: float | None = Field(default=None, ge=0, le=1); active: bool | None = None
+class RelationInput(BaseModel): source: str; relation: str; target: str; confidence: float = Field(default=.5, ge=0, le=1); valid_from: str | None = None; valid_to: str | None = None; properties: dict = {}
+class EventInput(BaseModel): event_type: str; entity_ids: list[str] = []; payload: dict = {}; timestamp: str | None = None; source: str = "system"
+class BeliefInput(BaseModel): statement: str = Field(min_length=1, max_length=5000); confidence: float = Field(default=.5, ge=0, le=1); evidence_refs: list[str] = []; status: str = "uncertain"
+class WorkspaceCandidateInput(BaseModel): source: str = Field(min_length=1, max_length=100); content: str = Field(min_length=1, max_length=20000); salience: float = Field(default=.5, ge=0, le=1); confidence: float = Field(default=.5, ge=0, le=1); urgency: float = Field(default=.5, ge=0, le=1); novelty: float = Field(default=.5, ge=0, le=1); relevance: float = Field(default=.5, ge=0, le=1); ttl: float = Field(default=30, ge=0, le=86400)
+class WorkspaceBroadcastInput(BaseModel): candidate_id: str | None = None; approved: bool = False
+class WorkspaceInterruptInput(BaseModel): reason: str = Field(default="higher-priority candidate", max_length=500)
+class WorkspaceSubscriptionInput(BaseModel): module_name: str = Field(min_length=1, max_length=100)
+class EventTimelineInput(BaseModel): event_type: str | None = None; phase: str | None = None; source: str | None = None; cycle_id: str | None = None; limit: int = 100; before: float | None = None; after: float | None = None
+class ToolInput(BaseModel): name: str; description: str; risk: float = Field(default=.5, ge=0, le=1)
+class ActionCheck(BaseModel): action: str; risk: float = Field(default=.5, ge=0, le=1)
+class ModelRegister(BaseModel): model_id: str = Field(min_length=1, max_length=200); path: str = Field(min_length=1, max_length=2000); context_size: int = Field(default=4096, ge=256, le=131072); n_threads: int | None = Field(default=None, ge=1, le=256); n_gpu_layers: int = Field(default=0, ge=0, le=999)
+class ModelActivate(BaseModel): model_id: str = Field(min_length=1, max_length=200)
+
+class SkillInput(BaseModel): name: str; category: str = "learned"; procedure: str = ""
+class AISessionInput(BaseModel): topic: str; participants: list[str] = ["Researcher", "Architect", "Critic"]
+class CodeProposalInput(BaseModel): title: str; author: str; target_file: str; diff_content: str
+
+def audit(event_type, payload):
+    db.execute("INSERT INTO audit_logs(event_type,payload,created_at) VALUES(?,?,?)", (event_type, json.dumps(payload), datetime.now(timezone.utc).isoformat()))
+
 @app.get("/health")
-async def health(): return {"ok":True,"service":"ConsciousCore","version":VERSION}
+async def health(): return {"ok": True, "service": "ConsciousCore", "version": VERSION}
+
 @app.get("/api/state")
 async def state(): return engine.snapshot()
+
 @app.post("/api/chat")
-async def chat(body:Chat): return await engine.process(body.message)
+async def chat(body: Chat): return await engine.process(body.message)
+
+@app.get("/api/v1/diagnostics/check-myself")
+async def check_myself():
+    res = DiagnosticsEngine.check_myself()
+    audit("diagnostics.check_myself", res)
+    return res
+
+@app.post("/api/v1/emergency-stop")
+async def emergency_stop():
+    audit("security.emergency_stop", {"status": "TRIGGERED"})
+    return {"status": "STOPPED", "message": "All autonomous background activity halted."}
+
+@app.get("/api/v1/skills")
+async def list_skills():
+    return {"items": skills_engine.list_skills()}
+
+@app.post("/api/v1/skills")
+async def discover_skill(body: SkillInput):
+    sk = skills_engine.discover_skill(body.name, body.category, body.procedure)
+    audit("skills.discovered", sk.to_dict())
+    return sk.to_dict()
+
+@app.get("/api/v1/learning")
+async def list_learning():
+    return {"lessons": learning_engine.get_lessons()}
+
+@app.get("/api/v1/ai-network/agents")
+async def list_agents():
+    return {"agents": ai_network_bus.list_agents()}
+
+@app.get("/api/v1/ai-network/sessions")
+async def list_ai_sessions():
+    return {"sessions": ai_network_bus.list_sessions()}
+
+@app.post("/api/v1/ai-network/sessions")
+async def start_ai_session(body: AISessionInput):
+    sess = ai_network_bus.start_session(body.topic, body.participants)
+    audit("ai_network.session_started", sess)
+    return sess
+
+@app.get("/api/v1/code/proposals")
+async def list_code_proposals():
+    return {"proposals": code_lab.list_proposals()}
+
+@app.post("/api/v1/code/proposals")
+async def submit_code_proposal(body: CodeProposalInput):
+    prop = code_lab.submit_proposal(body.title, body.author, body.target_file, body.diff_content)
+    audit("code_lab.proposal_submitted", prop.to_dict())
+    return prop.to_dict()
+
+@app.post("/api/v1/code/proposals/{proposal_id}/approve")
+async def approve_code_proposal(proposal_id: str):
+    prop = code_lab.approve_proposal(proposal_id)
+    if not prop: raise HTTPException(404, "proposal_not_found")
+    audit("code_lab.proposal_approved", prop.to_dict())
+    return prop.to_dict()
+
 @app.get("/api/loop")
 async def loop_state(): return engine.loop.snapshot()
+
 @app.post("/api/loop/run")
-async def run_loop(body:Chat): result=await engine.process(body.message); audit("loop.completed",{"cycle_id":result["cycle"]["cycle_id"]}); return result
+async def run_loop(body: Chat): result = await engine.process(body.message); audit("loop.completed", {"cycle_id": result["cycle"]["cycle_id"]}); return result
+
 @app.get("/api/internal-state")
-async def internal_state(): return {"state":engine.internal_state.snapshot(),"status":engine.internal_state.status()}
+async def internal_state(): return {"state": engine.internal_state.snapshot(), "status": engine.internal_state.status()}
+
 @app.post("/api/internal-state/transition")
-async def transition_state(body:StateTransition): result=engine.internal_state.transition(uncertainty=body.uncertainty,energy_delta=body.energy_delta,valence_delta=body.valence_delta); audit("internal_state.transition",result); return {"state":result,"status":engine.internal_state.status()}
+async def transition_state(body: StateTransition): result = engine.internal_state.transition(uncertainty=body.uncertainty, energy_delta=body.energy_delta, valence_delta=body.valence_delta); audit("internal_state.transition", result); return {"state": result, "status": engine.internal_state.status()}
+
 @app.post("/api/internal-state/recover")
-async def recover_state(body:StateRecovery): result=engine.internal_state.recover(body.amount); audit("internal_state.recover",result); return {"state":result,"status":engine.internal_state.status()}
+async def recover_state(body: StateRecovery): result = engine.internal_state.recover(body.amount); audit("internal_state.recover", result); return {"state": result, "status": engine.internal_state.status()}
+
 @app.get("/api/self")
 async def self_model(): return engine.snapshot()["self_model_v2"]
+
 @app.patch("/api/self")
-async def update_self_model(body:SelfModelUpdate):
-    result=engine.self_model_v2.update_role(body.role,body.autonomy_level)
-    if body.autonomy_level is not None: engine.safety.autonomy_level=body.autonomy_level
-    audit("self_model.updated",result); return result
+async def update_self_model(body: SelfModelUpdate):
+    result = engine.self_model_v2.update_role(body.role, body.autonomy_level)
+    if body.autonomy_level is not None: engine.safety.autonomy_level = body.autonomy_level
+    audit("self_model.updated", result); return result
+
 @app.get("/api/self/capabilities")
-async def self_capabilities(): return {"capabilities":engine.self_model_v2.model.capabilities}
+async def self_capabilities(): return {"capabilities": engine.self_model_v2.model.capabilities}
+
 @app.get("/api/self/limitations")
-async def self_limitations(): return {"limitations":engine.self_model_v2.model.limitations,"boundaries":engine.self_model_v2.model.boundaries}
+async def self_limitations(): return {"limitations": engine.self_model_v2.model.limitations, "boundaries": engine.self_model_v2.model.boundaries}
+
 @app.get("/api/memory")
-async def memories(q:str="",limit:int=20,kind:str|None=None,consolidated:bool|None=None): limit=max(1,min(limit,1000)); return {"items":[m.json() for m in engine.memory.search(q,limit,kind,consolidated)],"stats":engine.memory.stats()}
+async def memories(q: str = "", limit: int = 20, kind: str | None = None, consolidated: bool | None = None): limit = max(1, min(limit, 1000)); return {"items": [m.json() for m in engine.memory.search(q, limit, kind, consolidated)], "stats": engine.memory.stats()}
+
 @app.get("/api/memory/stats")
 async def memory_stats(): return engine.memory.stats()
+
 @app.get("/api/memory/{memory_id}")
-async def get_memory(memory_id:int):
-    m=engine.memory.get(memory_id)
-    if not m: raise HTTPException(404,"memory_not_found")
+async def get_memory(memory_id: int):
+    m = engine.memory.get(memory_id)
+    if not m: raise HTTPException(404, "memory_not_found")
     return m.json()
+
 @app.post("/api/memory")
-async def add_memory(body:MemoryInput): m=engine.memory.add(body.content,body.kind,body.importance,body.confidence,tags=body.tags,source=body.source); audit("memory.created",{"memory_id":m.id}); return m.json()
+async def add_memory(body: MemoryInput): m = engine.memory.add(body.content, body.kind, body.importance, body.confidence, tags=body.tags, source=body.source); audit("memory.created", {"memory_id": m.id}); return m.json()
+
 @app.patch("/api/memory/{memory_id}")
-async def update_memory(memory_id:int,body:MemoryUpdate):
-    m=engine.memory.update(memory_id,body.importance,body.confidence,body.kind,body.tags,body.source,body.consolidated)
-    if not m: raise HTTPException(404,"memory_not_found")
-    audit("memory.updated",{"memory_id":memory_id}); return m.json()
+async def update_memory(memory_id: int, body: MemoryUpdate):
+    m = engine.memory.update(memory_id, body.importance, body.confidence, body.kind, body.tags, body.source, body.consolidated)
+    if not m: raise HTTPException(404, "memory_not_found")
+    audit("memory.updated", {"memory_id": memory_id}); return m.json()
+
 @app.delete("/api/memory/{memory_id}")
-async def delete_memory(memory_id:int):
-    if not engine.memory.delete(memory_id): raise HTTPException(404,"memory_not_found")
-    audit("memory.deleted",{"memory_id":memory_id}); return {"deleted":True,"id":memory_id}
+async def delete_memory(memory_id: int):
+    if not engine.memory.delete(memory_id): raise HTTPException(404, "memory_not_found")
+    audit("memory.deleted", {"memory_id": memory_id}); return {"deleted": True, "id": memory_id}
+
 @app.post("/api/memory/consolidate")
-async def consolidate(): result=engine.sleep.run(); audit("memory.consolidated",result); return result
+async def consolidate(): result = engine.sleep.run(); audit("memory.consolidated", result); return result
+
 @app.get("/api/workspace")
 async def workspace(): return engine.workspace
+
 @app.get("/api/attention")
-async def attention(): return {"focus":engine.workspace.get("focus"),"items":engine.workspace.get("attention",[]),"uncertainty":engine.internal_state.state.uncertainty}
+async def attention(): return {"focus": engine.workspace.get("focus"), "items": engine.workspace.get("attention", []), "uncertainty": engine.internal_state.state.uncertainty}
+
 @app.get("/api/workspace/v2")
 async def workspace_v2(): return engine.global_workspace_v2.snapshot()
+
 @app.post("/api/workspace/v2/candidates")
-async def workspace_candidate(body:WorkspaceCandidateInput):
-    result=engine.global_workspace_v2.submit_candidate(**body.model_dump()); audit("workspace.candidate.created",{"candidate_id":result["id"]}); return result
+async def workspace_candidate(body: WorkspaceCandidateInput):
+    result = engine.global_workspace_v2.submit_candidate(**body.model_dump()); audit("workspace.candidate.created", {"candidate_id": result["id"]}); return result
+
 @app.post("/api/workspace/v2/select")
-async def workspace_select(): return {"winner":engine.global_workspace_v2.select_winner(),"snapshot":engine.global_workspace_v2.snapshot()}
+async def workspace_select(): return {"winner": engine.global_workspace_v2.select_winner(), "snapshot": engine.global_workspace_v2.snapshot()}
+
 @app.post("/api/workspace/v2/broadcast")
-async def workspace_broadcast(body:WorkspaceBroadcastInput):
-    try: result=engine.global_workspace_v2.broadcast(body.candidate_id,body.approved)
-    except PermissionError as exc: raise HTTPException(403,str(exc))
-    except (KeyError,ValueError) as exc: raise HTTPException(400,str(exc))
-    audit("workspace.broadcast",result); return result
+async def workspace_broadcast(body: WorkspaceBroadcastInput):
+    try: result = engine.global_workspace_v2.broadcast(body.candidate_id, body.approved)
+    except PermissionError as exc: raise HTTPException(403, str(exc))
+    except (KeyError, ValueError) as exc: raise HTTPException(400, str(exc))
+    audit("workspace.broadcast", result); return result
+
 @app.post("/api/workspace/v2/interrupt")
-async def workspace_interrupt(body:WorkspaceInterruptInput): result=engine.global_workspace_v2.interrupt(body.reason); audit("workspace.interruption",result); return result
+async def workspace_interrupt(body: WorkspaceInterruptInput): result = engine.global_workspace_v2.interrupt(body.reason); audit("workspace.interruption", result); return result
+
 @app.get("/api/workspace/v2/history")
-async def workspace_history(limit:int=50): return {"items":engine.global_workspace_v2.history(limit)}
+async def workspace_history(limit: int = 50): return {"items": engine.global_workspace_v2.history(limit)}
+
 @app.post("/api/workspace/v2/subscribe")
-async def workspace_subscribe(body:WorkspaceSubscriptionInput): return engine.global_workspace_v2.subscribe(body.module_name)
+async def workspace_subscribe(body: WorkspaceSubscriptionInput): return engine.global_workspace_v2.subscribe(body.module_name)
+
 @app.delete("/api/workspace/v2/subscribe/{module}")
-async def workspace_unsubscribe(module:str): return engine.global_workspace_v2.unsubscribe(module)
+async def workspace_unsubscribe(module: str): return engine.global_workspace_v2.unsubscribe(module)
+
 @app.get("/api/events/v2")
-async def events_v2(q:EventTimelineInput=__import__('fastapi').Query(default_factory=EventTimelineInput)):
-    return {"items":engine.events.query(cycle_id=q.cycle_id,phase=q.phase,source=q.source,event_type=q.event_type,limit=q.limit,before=q.before,after=q.after),"stats":engine.events.stats()}
+async def events_v2(q: EventTimelineInput = __import__('fastapi').Query(default_factory=EventTimelineInput)):
+    return {"items": engine.events.query(cycle_id=q.cycle_id, phase=q.phase, source=q.source, event_type=q.event_type, limit=q.limit, before=q.before, after=q.after), "stats": engine.events.stats()}
+
 @app.get("/api/events/v2/timeline")
-async def events_timeline(cycle_id:str|None=None,phase:str|None=None,source:str|None=None,event_type:str|None=None,limit:int=100): return {"items":engine.events.timeline(max(1,min(limit,1000)),cycle_id) if not any((phase,source,event_type)) else list(reversed(engine.events.query(cycle_id=cycle_id,phase=phase,source=source,event_type=event_type,limit=max(1,min(limit,1000)))))}
+async def events_timeline(cycle_id: str | None = None, phase: str | None = None, source: str | None = None, event_type: str | None = None, limit: int = 100): return {"items": engine.events.timeline(max(1, min(limit, 1000)), cycle_id) if not any((phase, source, event_type)) else list(reversed(engine.events.query(cycle_id=cycle_id, phase=phase, source=source, event_type=event_type, limit=max(1, min(limit, 1000)))))}
+
 @app.get("/api/events/v2/cycle/{cycle_id}")
-async def events_cycle(cycle_id:str,limit:int=500): return {"cycle_id":cycle_id,"items":engine.events.by_cycle(cycle_id,max(1,min(limit,1000)))}
+async def events_cycle(cycle_id: str, limit: int = 500): return {"cycle_id": cycle_id, "items": engine.events.by_cycle(cycle_id, max(1, min(limit, 1000)))}
+
 @app.get("/api/events/v2/phase/{phase}")
-async def events_phase(phase:str,limit:int=100): return {"phase":phase,"items":engine.events.by_phase(phase,max(1,min(limit,1000)))}
+async def events_phase(phase: str, limit: int = 100): return {"phase": phase, "items": engine.events.by_phase(phase, max(1, min(limit, 1000)))}
+
 @app.get("/api/events/v2/stats")
 async def events_stats(): return engine.events.stats()
+
 @app.get("/api/metacognition")
 async def metacognition(): return engine.meta
+
 @app.get("/api/prediction")
 async def prediction(): return engine.last_prediction
+
 @app.get("/api/world")
 async def world(): return engine.world.snapshot()
+
 @app.get("/api/world/query")
-async def world_query(q:str=""): return engine.world.query(q)
+async def world_query(q: str = ""): return engine.world.query(q)
+
 @app.post("/api/world/entities")
-async def add_entity(body:EntityInput): result=engine.world.add_entity(body.id,body.label,body.kind,body.properties,body.confidence); audit("world.entity.upserted",{"entity_id":body.id}); return result
+async def add_entity(body: EntityInput): result = engine.world.add_entity(body.id, body.label, body.kind, body.properties, body.confidence); audit("world.entity.upserted", {"entity_id": body.id}); return result
+
 @app.patch("/api/world/entities/{entity_id}")
-async def update_entity(entity_id:str,body:EntityUpdate):
-    result=engine.world.update_entity(entity_id,**body.model_dump(exclude_none=True))
-    if not result: raise HTTPException(404,"world_entity_not_found")
-    audit("world.entity.updated",{"entity_id":entity_id}); return result
+async def update_entity(entity_id: str, body: EntityUpdate):
+    result = engine.world.update_entity(entity_id, **body.model_dump(exclude_none=True))
+    if not result: raise HTTPException(404, "world_entity_not_found")
+    audit("world.entity.updated", {"entity_id": entity_id}); return result
+
 @app.get("/api/world/history/{entity_id}")
-async def entity_history(entity_id:str): return {"entity_id":entity_id,"history":engine.world.history(entity_id)}
+async def entity_history(entity_id: str): return {"entity_id": entity_id, "history": engine.world.history(entity_id)}
+
 @app.post("/api/world/relations")
-async def add_relation(body:RelationInput): result=engine.world.add_relation(body.source,body.relation,body.target,body.confidence,body.valid_from,body.valid_to,body.properties); audit("world.relation.created",{"relation_id":result["id"]}); return result
+async def add_relation(body: RelationInput): result = engine.world.add_relation(body.source, body.relation, body.target, body.confidence, body.valid_from, body.valid_to, body.properties); audit("world.relation.created", {"relation_id": result["id"]}); return result
+
 @app.post("/api/world/relations/{relation_id}/close")
-async def close_relation(relation_id:int,valid_to:str|None=None): result=engine.world.close_relation(relation_id,valid_to); audit("world.relation.closed",{"relation_id":relation_id}); return result
+async def close_relation(relation_id: int, valid_to: str | None = None): result = engine.world.close_relation(relation_id, valid_to); audit("world.relation.closed", {"relation_id": relation_id}); return result
+
 @app.post("/api/world/events")
-async def add_event(body:EventInput): result=engine.world.add_event(body.event_type,body.entity_ids,body.payload,body.timestamp,body.source); audit("world.event.created",{"event_id":result["id"]}); return result
+async def add_event(body: EventInput): result = engine.world.add_event(body.event_type, body.entity_ids, body.payload, body.timestamp, body.source); audit("world.event.created", {"event_id": result["id"]}); return result
+
 @app.post("/api/world/beliefs")
-async def add_belief(body:BeliefInput): result=engine.world.add_belief(body.statement,body.confidence,body.evidence_refs,body.status); audit("world.belief.created",{"belief_id":result["id"]}); return result
+async def add_belief(body: BeliefInput): result = engine.world.add_belief(body.statement, body.confidence, body.evidence_refs, body.status); audit("world.belief.created", {"belief_id": result["id"]}); return result
+
 @app.get("/api/world/contradictions")
-async def world_contradictions(): return {"items":engine.world.detect_contradictions()}
+async def world_contradictions(): return {"items": engine.world.detect_contradictions()}
+
 @app.get("/api/goals")
-async def goals(): return {"items":engine.goals.snapshot()}
+async def goals(): return {"items": engine.goals.snapshot()}
+
 @app.post("/api/goals")
-async def add_goal(body:Goal): g=engine.goals.add(body.title,body.priority); audit("goal.created",{"goal_id":g.id}); return asdict(g)
+async def add_goal(body: Goal): g = engine.goals.add(body.title, body.priority); audit("goal.created", {"goal_id": g.id}); return asdict(g)
+
 @app.patch("/api/goals/{goal_id}")
-async def update_goal(goal_id:int,body:GoalUpdate):
-    try:g=engine.goals.update(goal_id,body.progress,body.status,body.priority)
-    except ValueError as exc: raise HTTPException(400,str(exc))
-    if not g: raise HTTPException(404,"goal_not_found")
-    audit("goal.updated",{"goal_id":goal_id,"progress":g.progress,"status":g.status}); return asdict(g)
+async def update_goal(goal_id: int, body: GoalUpdate):
+    try: g = engine.goals.update(goal_id, body.progress, body.status, body.priority)
+    except ValueError as exc: raise HTTPException(400, str(exc))
+    if not g: raise HTTPException(404, "goal_not_found")
+    audit("goal.updated", {"goal_id": goal_id, "progress": g.progress, "status": g.status}); return asdict(g)
+
 @app.delete("/api/goals/{goal_id}")
-async def delete_goal(goal_id:int):
-    if not engine.goals.delete(goal_id): raise HTTPException(404,"goal_not_found")
-    audit("goal.deleted",{"goal_id":goal_id}); return {"deleted":True,"id":goal_id}
+async def delete_goal(goal_id: int):
+    if not engine.goals.delete(goal_id): raise HTTPException(404, "goal_not_found")
+    audit("goal.deleted", {"goal_id": goal_id}); return {"deleted": True, "id": goal_id}
+
 @app.get("/api/plans")
-async def plans(limit:int=100): return {"items":engine.planner.list(limit)}
+async def plans(limit: int = 100): return {"items": engine.planner.list(limit)}
+
 @app.post("/api/plans")
-async def create_plan(body:PlanRequest): p=engine.planner.create(body.goal,body.constraints); audit("plan.created",{"plan_id":p["id"]}); return p
+async def create_plan(body: PlanRequest): p = engine.planner.create(body.goal, body.constraints); audit("plan.created", {"plan_id": p["id"]}); return p
+
 @app.get("/api/plans/{plan_id}")
-async def get_plan(plan_id:int):
-    p=engine.planner.get(plan_id)
-    if not p: raise HTTPException(404,"plan_not_found")
+async def get_plan(plan_id: int):
+    p = engine.planner.get(plan_id)
+    if not p: raise HTTPException(404, "plan_not_found")
     return p
+
 @app.patch("/api/plans/{plan_id}/steps/{step_id}")
-async def update_plan_step(plan_id:int,step_id:int,body:PlanStepUpdate):
-    try:p=engine.planner.update_step(plan_id,step_id,body.status)
-    except ValueError as exc: raise HTTPException(400,str(exc))
-    if not p: raise HTTPException(404,"plan_or_step_not_found")
-    audit("plan.step.updated",{"plan_id":plan_id,"step_id":step_id,"status":body.status}); return p
+async def update_plan_step(plan_id: int, step_id: int, body: PlanStepUpdate):
+    try: p = engine.planner.update_step(plan_id, step_id, body.status)
+    except ValueError as exc: raise HTTPException(400, str(exc))
+    if not p: raise HTTPException(404, "plan_or_step_not_found")
+    audit("plan.step.updated", {"plan_id": plan_id, "step_id": step_id, "status": body.status}); return p
+
 @app.post("/api/plans/{plan_id}/steps/{step_id}/execute")
-async def execute_plan_step(plan_id:int,step_id:int,body:ExecutionRequest):
-    try: result=engine.execution.advance(plan_id,step_id,body.risk,body.approved)
-    except ValueError as exc: raise HTTPException(400,str(exc))
-    if not result: raise HTTPException(404,"plan_or_step_not_found")
-    audit("plan.step.execution",result); return result
+async def execute_plan_step(plan_id: int, step_id: int, body: ExecutionRequest):
+    try: result = engine.execution.advance(plan_id, step_id, body.risk, body.approved)
+    except ValueError as exc: raise HTTPException(400, str(exc))
+    if not result: raise HTTPException(404, "plan_or_step_not_found")
+    audit("plan.step.execution", result); return result
+
 @app.get("/api/execution")
-async def execution_state(): return {"last":engine.execution.snapshot(),"safety":engine.safety.snapshot()}
+async def execution_state(): return {"last": engine.execution.snapshot(), "safety": engine.safety.snapshot()}
+
 @app.delete("/api/plans/{plan_id}")
-async def delete_plan(plan_id:int):
-    if not engine.planner.delete(plan_id): raise HTTPException(404,"plan_not_found")
-    audit("plan.deleted",{"plan_id":plan_id}); return {"deleted":True,"id":plan_id}
+async def delete_plan(plan_id: int):
+    if not engine.planner.delete(plan_id): raise HTTPException(404, "plan_not_found")
+    audit("plan.deleted", {"plan_id": plan_id}); return {"deleted": True, "id": plan_id}
+
 @app.get("/api/models")
 async def models(): return engine.model_manager.list()
+
 @app.post("/api/models/discover")
-async def discover_models(): found=engine.model_manager.discover_gguf(); audit("models.discovered",{"models":found}); return {"discovered":found,**engine.model_manager.list()}
+async def discover_models(): found = engine.model_manager.discover_gguf(); audit("models.discovered", {"models": found}); return {"discovered": found, **engine.model_manager.list()}
+
 @app.post("/api/models/register")
-async def register_model(body:ModelRegister):
-    kwargs={"n_ctx":body.context_size,"n_gpu_layers":body.n_gpu_layers};
-    if body.n_threads is not None: kwargs["n_threads"]=body.n_threads
-    try: info=engine.model_manager.register_gguf(body.model_id,body.path,**kwargs)
-    except (ValueError,OSError) as exc: raise HTTPException(400,str(exc))
-    audit("model.registered",{"model_id":body.model_id}); return info
+async def register_model(body: ModelRegister):
+    kwargs = {"n_ctx": body.context_size, "n_gpu_layers": body.n_gpu_layers}
+    if body.n_threads is not None: kwargs["n_threads"] = body.n_threads
+    try: info = engine.model_manager.register_gguf(body.model_id, body.path, **kwargs)
+    except (ValueError, OSError) as exc: raise HTTPException(400, str(exc))
+    audit("model.registered", {"model_id": body.model_id}); return info
+
 @app.post("/api/models/activate")
-async def activate_model(body:ModelActivate):
-    try:info=engine.activate_model(body.model_id)
-    except KeyError:raise HTTPException(404,"model_not_found")
-    audit("model.activated",{"model_id":body.model_id}); return info
+async def activate_model(body: ModelActivate):
+    try: info = engine.activate_model(body.model_id)
+    except KeyError: raise HTTPException(404, "model_not_found")
+    audit("model.activated", {"model_id": body.model_id}); return info
+
 @app.get("/api/models/active")
 async def active_model(): return engine.model.info()
+
 @app.get("/api/reflection")
-async def get_reflection(): return {"reflection":asdict(engine.last_reflection) if engine.last_reflection else None,"history":engine.reflection.recent()}
+async def get_reflection(): return {"reflection": asdict(engine.last_reflection) if engine.last_reflection else None, "history": engine.reflection.recent()}
+
 @app.post("/api/reflection")
-async def reflection(): r=engine.reflection.reflect(engine.workspace.get("input",""),"",engine.memory.count(),engine.state.uncertainty); engine.last_reflection=r; return asdict(r)
+async def reflection(): r = engine.reflection.reflect(engine.workspace.get("input", ""), "", engine.memory.count(), engine.state.uncertainty); engine.last_reflection = r; return asdict(r)
+
 @app.get("/api/safety")
 async def safety(): return engine.safety.snapshot()
+
 @app.post("/api/safety/check")
-async def safety_check(body:ActionCheck): result=asdict(engine.safety.evaluate(body.action,body.risk)); audit("safety.check",{"request":body.model_dump(),"result":result}); return result
+async def safety_check(body: ActionCheck): result = asdict(engine.safety.evaluate(body.action, body.risk)); audit("safety.check", {"request": body.model_dump(), "result": result}); return result
+
 @app.get("/api/tools")
-async def tools(): return {"items":engine.tools.snapshot()}
+async def tools(): return {"items": engine.tools.snapshot()}
+
 @app.post("/api/tools")
-async def register_tool(body:ToolInput): return engine.tools.register(body.name,body.description,body.risk)
+async def register_tool(body: ToolInput): return engine.tools.register(body.name, body.description, body.risk)
+
 @app.get("/api/tools/{name}/authorize")
-async def authorize_tool(name:str): result=engine.tools.authorize(name); audit("tool.authorization",{"tool":name,"result":result}); return result
+async def authorize_tool(name: str): result = engine.tools.authorize(name); audit("tool.authorization", {"tool": name, "result": result}); return result
+
 @app.get("/api/sleep")
 async def sleep_status(): return engine.sleep.snapshot()
+
 @app.post("/api/sleep")
 async def sleep(): return engine.sleep.run()
+
 @app.get("/api/audit")
-async def audit_logs(limit:int=100): return {"items":db.fetchall("SELECT * FROM audit_logs ORDER BY id DESC LIMIT ?",(max(1,min(limit,1000)),))}
+async def audit_logs(limit: int = 100): return {"items": db.fetchall("SELECT * FROM audit_logs ORDER BY id DESC LIMIT ?", (max(1, min(limit, 1000)),))}
+
 @app.get("/api/settings")
-async def settings(): return {"autonomy_level":engine.self_model_v2.model.autonomy_level,"local_only":True,"cloud_models":False,"external_actions_require_approval":True}
+async def settings(): return {"autonomy_level": engine.self_model_v2.model.autonomy_level, "local_only": True, "cloud_models": False, "external_actions_require_approval": True}
+
 @app.websocket("/ws/events")
-async def events(ws:WebSocket):
-    await ws.accept(); q=engine.events.subscribe()
+async def events(ws: WebSocket):
+    await ws.accept(); q = engine.events.subscribe()
     try:
-        while True:e=await q.get(); await ws.send_json({"type":e.type,"payload":e.payload,"timestamp":e.timestamp})
-    except Exception:engine.events.unsubscribe(q)
+        while True: e = await q.get(); await ws.send_json({"type": e.type, "payload": e.payload, "timestamp": e.timestamp})
+    except Exception: engine.events.unsubscribe(q)

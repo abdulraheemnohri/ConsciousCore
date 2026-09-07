@@ -2,7 +2,7 @@ import React from 'react';
 import {
   Activity, MessageSquare, Brain, Zap, Database, Network, UserRound, Target,
   Workflow, BookOpen, LineChart, Box, Layers, Clock3, Shield, Cpu, Sliders,
-  Radio, Server, History, Settings
+  Radio, Server, History, Settings, Sparkles, Code, Users, Bot, KeyRound, Terminal, Compass
 } from 'lucide-react';
 
 export interface NavSection {
@@ -20,17 +20,31 @@ export const navSections: NavSection[] = [
       { name: 'Dashboard', icon: Activity },
       { name: 'Chat Workspace', icon: MessageSquare },
       { name: 'Global Workspace', icon: Brain },
-      { name: 'Attention Center', icon: Zap }
+      { name: 'Attention Center', icon: Zap },
+      { name: 'Onboarding', icon: Compass }
     ]
   },
   {
-    title: 'Memory & State',
+    title: 'Cognition & Knowledge',
     items: [
+      { name: 'Knowledge', icon: BookOpen },
+      { name: 'Skills', icon: Zap },
+      { name: 'Learning', icon: Sparkles },
       { name: 'Memory', icon: Database },
       { name: 'Memory Federation', icon: Network },
       { name: 'Self Model', icon: UserRound },
       { name: 'World Model', icon: Network },
       { name: 'Internal State', icon: Layers }
+    ]
+  },
+  {
+    title: 'AI Network & Agents',
+    items: [
+      { name: 'AI Network', icon: Network },
+      { name: 'AI Conversations', icon: MessageSquare },
+      { name: 'Agents', icon: Users },
+      { name: 'Experiments', icon: Box },
+      { name: 'Code Lab', icon: Code }
     ]
   },
   {
@@ -47,19 +61,16 @@ export const navSections: NavSection[] = [
     ]
   },
   {
-    title: 'Runtime & AI Engine',
+    title: 'Runtime & System',
     items: [
       { name: 'Runtime Center', icon: Cpu },
       { name: 'Models', icon: Sliders },
       { name: 'Parallel AI', icon: Radio },
-      { name: 'Distributed Nodes', icon: Server }
-    ]
-  },
-  {
-    title: 'System & Control',
-    items: [
+      { name: 'Distributed Nodes', icon: Server },
       { name: 'Tools', icon: Box },
-      { name: 'Safety', icon: Shield },
+      { name: 'Security', icon: Shield },
+      { name: 'System', icon: Terminal },
+      { name: 'Activity', icon: Clock3 },
       { name: 'Telemetry', icon: LineChart },
       { name: 'Analytics', icon: Activity },
       { name: 'Logs', icon: History },
@@ -84,7 +95,7 @@ export function Sidebar({ currentPage, onNavigate, autonomyLevel = 1 }: SidebarP
         </span>
         <div>
           <b>ConsciousCore</b>
-          <small>V2.6.0 · Universal Layer</small>
+          <small>V1.0 · Universal OS</small>
         </div>
       </div>
 

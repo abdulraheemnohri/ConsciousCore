@@ -1,0 +1,12 @@
+{
+  "skills": [
+    {
+      "id": "skill_system_diag",
+      "name": "System Diagnostic Check",
+      "category": "system",
+      "version": "1.0.0",
+      "state": "ACTIVE",
+      "permissions": ["READ"]
+    }
+  ]
+}
