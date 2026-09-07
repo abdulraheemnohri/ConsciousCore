@@ -227,12 +227,16 @@ class Planner:
 
     # ==================== Plan Retrieval ====================
     
-    def get(self, plan_id: int) -> Plan | None:
-        """Get a plan by ID."""
+    def _get_plan_obj(self, plan_id: int) -> Plan | None:
         row = db.fetchone("SELECT * FROM plans WHERE id=?", (plan_id,))
         if not row:
             return None
         return self._row_to_plan(row)
+
+    def get(self, plan_id: int) -> dict | None:
+        """Get a plan by ID."""
+        plan = self._get_plan_obj(plan_id)
+        return plan.json() if plan else None
 
     def get_by_goal(self, goal_id: int) -> list[Plan]:
         """Get all plans for a specific goal."""
@@ -263,9 +267,9 @@ class Planner:
         current_step_id: int | None = None,
         progress: float | None = None,
         metadata: dict | None = None
-    ) -> Plan | None:
+    ) -> dict | None:
         """Update a plan."""
-        plan = self.get(plan_id)
+        plan = self._get_plan_obj(plan_id)
         if not plan:
             return None
         
@@ -311,9 +315,9 @@ class Planner:
         status: str | None = None,
         result: str | None = None,
         error: str | None = None
-    ) -> Plan | None:
+    ) -> dict | None:
         """Update the status of a specific step in a plan."""
-        plan = self.get(plan_id)
+        plan = self._get_plan_obj(plan_id)
         if not plan:
             return None
         
@@ -349,14 +353,14 @@ class Planner:
         )
         
         # Update plan progress
-        completed_steps = sum(1 for s in updated_steps if s["status"] == StepStatus.COMPLETED.value)
+        completed_steps = sum(1 for s in updated_steps if s.get("status") == StepStatus.COMPLETED.value)
         total_steps = len(updated_steps)
         progress = completed_steps / total_steps if total_steps > 0 else 0.0
         
         # Update plan status based on steps
-        if all(s["status"] == StepStatus.COMPLETED.value for s in updated_steps):
+        if all(s.get("status") == StepStatus.COMPLETED.value for s in updated_steps):
             self.update(plan_id, status=PlanStatus.COMPLETED.value, progress=1.0)
-        elif any(s["status"] == StepStatus.FAILED.value for s in updated_steps):
+        elif any(s.get("status") == StepStatus.FAILED.value for s in updated_steps):
             self.update(plan_id, status=PlanStatus.FAILED.value)
         else:
             self.update(plan_id, progress=progress)

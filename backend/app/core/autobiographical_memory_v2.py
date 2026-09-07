@@ -79,13 +79,12 @@ class AutobiographicalMemoryV2:
         title = _clip(title, 240).strip() or "Cognitive episode"
         summary = _clip(summary, 4000); input_text = _clip(input_text); response_summary = _clip(response_summary, 4000)
         tags = _safe_tags(tags); metadata = metadata if isinstance(metadata, dict) else {}
-        db.execute("""INSERT INTO autobiographical_episodes_v2
+        cur = db.execute("""INSERT INTO autobiographical_episodes_v2
             (cycle_id,started_at,ended_at,title,summary,input_text,response_summary,active_goal_id,plan_id,reflection_id,learning_ids,event_ids,importance,confidence,tags,metadata,archived,created_at)
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (cycle_id,started_at,ended_at,title,summary,input_text,response_summary,active_goal_id,plan_id,reflection_id,
              json.dumps(list(learning_ids or [])[:100]),json.dumps(list(event_ids or [])[:100]),self._clamp(importance),self._clamp(confidence),json.dumps(tags),json.dumps(metadata)[:20000],0,now))
-        row = db.fetchone("SELECT * FROM autobiographical_episodes_v2 WHERE id=last_insert_rowid()")
-        return self._row(row)
+        return self.get(cur.lastrowid)
 
     def get(self, episode_id: int):
         row = db.fetchone("SELECT * FROM autobiographical_episodes_v2 WHERE id=?", (episode_id,))

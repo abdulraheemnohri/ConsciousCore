@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS goals (id INTEGER PRIMARY KEY AUTOINCREMENT, title TE
 CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, goal_id INTEGER NOT NULL, title TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', priority REAL NOT NULL DEFAULT 0.5, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deadline TEXT, description TEXT, FOREIGN KEY (goal_id) REFERENCES goals(id));
 
 -- Plans
-CREATE TABLE IF NOT EXISTS plans (id INTEGER PRIMARY KEY AUTOINCREMENT, goal_id INTEGER NOT NULL, constraints TEXT NOT NULL DEFAULT '[]', steps TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'active', FOREIGN KEY (goal_id) REFERENCES goals(id));
+CREATE TABLE IF NOT EXISTS plans (id INTEGER PRIMARY KEY AUTOINCREMENT, goal TEXT, goal_id INTEGER, constraints TEXT NOT NULL DEFAULT '[]', steps TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'active', progress REAL NOT NULL DEFAULT 0.0, metadata TEXT NOT NULL DEFAULT '{}', FOREIGN KEY (goal_id) REFERENCES goals(id));
 
 -- Plan Versions
 CREATE TABLE IF NOT EXISTS plan_versions (id INTEGER PRIMARY KEY AUTOINCREMENT, plan_id INTEGER NOT NULL, version INTEGER NOT NULL, steps TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL, FOREIGN KEY (plan_id) REFERENCES plans(id));
@@ -149,7 +149,13 @@ CREATE TABLE IF NOT EXISTS runtime_requests (id INTEGER PRIMARY KEY AUTOINCREMEN
 CREATE TABLE IF NOT EXISTS runtime_results (id INTEGER PRIMARY KEY AUTOINCREMENT, request_id TEXT NOT NULL, mode TEXT NOT NULL, provider TEXT, model TEXT, response TEXT, confidence REAL NOT NULL DEFAULT 0.5, degraded INTEGER NOT NULL DEFAULT 0, latency_ms INTEGER, candidates TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL DEFAULT (datetime('now')), FOREIGN KEY (request_id) REFERENCES runtime_requests(request_id));
 
 -- Telemetry Events
-CREATE TABLE IF NOT EXISTS telemetry_events (id INTEGER PRIMARY KEY AUTOINCREMENT, event_type TEXT NOT NULL, payload TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL DEFAULT (datetime('now')));
+CREATE TABLE IF NOT EXISTS telemetry_events (id INTEGER PRIMARY KEY AUTOINCREMENT, event_type TEXT NOT NULL, payload TEXT NOT NULL DEFAULT '{}', metadata TEXT NOT NULL DEFAULT '{}', timestamp TEXT NOT NULL DEFAULT (datetime('now')), created_at TEXT NOT NULL DEFAULT (datetime('now')));
+CREATE INDEX IF NOT EXISTS idx_telemetry_events_type ON telemetry_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_telemetry_events_timestamp ON telemetry_events(timestamp);
+
+-- Telemetry Metrics
+CREATE TABLE IF NOT EXISTS telemetry_metrics (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, value REAL NOT NULL, tags TEXT NOT NULL DEFAULT '{}', timestamp TEXT NOT NULL DEFAULT (datetime('now')));
+CREATE INDEX IF NOT EXISTS idx_telemetry_metrics_name ON telemetry_metrics(name);
 
 -- Nodes
 CREATE TABLE IF NOT EXISTS nodes (id INTEGER PRIMARY KEY AUTOINCREMENT, node_id TEXT NOT NULL UNIQUE, name TEXT NOT NULL, address TEXT, capabilities TEXT NOT NULL DEFAULT '[]', models TEXT NOT NULL DEFAULT '[]', memory_capacity INTEGER, cpu TEXT, ram INTEGER, gpu TEXT, status TEXT NOT NULL DEFAULT 'offline', latency INTEGER, last_seen TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')));
