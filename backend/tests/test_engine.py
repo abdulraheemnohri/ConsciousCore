@@ -25,7 +25,7 @@ async def test_memory_retrieval():
 
 def test_goals_are_persistent():
     e1 = CognitiveEngine()
-    goal = e1.goals.add("Build local cognitive runtime", .9)
+    goal = e1.goals.add("Build local cognitive runtime", priority=.9)
     e2 = CognitiveEngine()
     assert any(g["id"] == goal.id for g in e2.goals.snapshot())
     updated = e2.goals.update(goal.id, progress=1.0)
@@ -36,7 +36,7 @@ def test_world_model_is_persistent():
     e = CognitiveEngine()
     e.world.add_entity("core", "ConsciousCore", "system")
     e.world.add_entity("memory", "Memory", "module")
-    e.world.relate("core", "uses", "memory", .9)
+    e.world.add_relation("core", "uses", "memory", .9)
     snapshot = CognitiveEngine().world.snapshot()
     assert len(snapshot["entities"]) == 2
     assert snapshot["relations"][0]["relation"] == "uses"

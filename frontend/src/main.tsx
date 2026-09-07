@@ -1,16 +1,155 @@
-import React,{useEffect,useState}from'react';import{createRoot}from'react-dom/client';import{Activity,Brain,Database,Layers,MessageSquare,Network,RefreshCw,Shield,Sliders,Target,Workflow,Clock3,Search,Send,Box,BookOpen,Eye,ChevronRight,Plus,Archive,Play,Pause,CheckCircle2,Settings,History,UserRound,Zap,Radio}from'lucide-react';import'./app-v3.css';
-const API=import.meta.env.VITE_API_URL||'http://127.0.0.1:8000';type Any=any;
-async function api(path:string,init?:RequestInit){const r=await fetch(API+path,init);if(!r.ok)throw Error(await r.text());return r.json()}
-const sections=[['Dashboard',Activity],['Chat Workspace',MessageSquare],['Cognitive Loop',Brain],['Memory',Database],['Goals',Target],['Planner',Workflow],['World Model',Network],['Global Workspace',Brain],['Event Timeline',History],['Learning',Zap],['Autobiographical',BookOpen],['Self Model',UserRound],['Internal State',Layers],['Safety',Shield],['Models',Sliders],['Sleep',Clock3],['Tools',Box],['Settings',Settings],['Audit',History]];
-function App(){const[page,setPage]=useState('Dashboard'),[state,setState]=useState<Any>({}),[chat,setChat]=useState<Any[]>([]),[msg,setMsg]=useState(''),[busy,setBusy]=useState(false);const load=()=>api('/api/state').then(setState).catch(()=>{});useEffect(()=>{load();const t=setInterval(load,4000);return()=>clearInterval(t)},[]);const send=async()=>{if(!msg.trim()||busy)return;const m=msg;setMsg('');setBusy(true);setChat(x=>[...x,{role:'user',text:m}]);try{const r=await api('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:m})});setChat(x=>[...x,{role:'ai',text:r.response}]);load()}catch(e){setChat(x=>[...x,{role:'ai',text:'Runtime error: '+String(e)}])}finally{setBusy(false)}};return <div className="cc"><aside className="side"><div className="brand"><span className="brandIcon"><Brain size={20}/></span><div><b>ConsciousCore</b><small>Local Cognitive Runtime</small></div></div><nav className="nav">{sections.map(([n,I]:Any)=><button className={page===n?'on':''} onClick={()=>setPage(n)} key={n}><I size={15}/><span>{n}</span></button>)}</nav><div className="sideFoot"><b>LOCAL ONLY</b><br/>Autonomy {state.safety?.autonomy_level??1}<br/><span className="muted">No silent external actions</span></div></aside><main className="main"><header className="head"><div><div className="eyebrow">COGNITIVE CONTROL CENTER · V3</div><h1>{page}</h1><div className="muted">Consciousness-inspired computational architecture — not a claim of subjective consciousness.</div></div><div className="pill">{state.model?.name||'Fallback'} · runtime</div></header>{page==='Dashboard'?<Dashboard s={state} go={setPage}/>:page==='Chat Workspace'?<Chat chat={chat} msg={msg} setMsg={setMsg} send={send} busy={busy}/>:page==='Memory'?<Memory/>:page==='Goals'?<Goals/>:page==='Autobiographical'?<Autobiographical/>:page==='Event Timeline'?<Events/>:page==='Settings'?<SettingsPanel s={state} reload={load}/>:page==='Cognitive Loop'?<Loop/>:<Generic page={page} s={state} reload={load}/>}</main></div>}
-function Dashboard({s,go}:Any){const metrics=[['Memory',s.memory_count??0],['Uncertainty',Math.round((s.state?.uncertainty??0)*100)+'%'],['Energy',Math.round((s.state?.energy??0)*100)+'%'],['Goals',(s.goals||[]).length]];return <><div className="grid">{metrics.map(x=><div className="card metric" key={x[0]}><span>{x[0]}</span><strong>{x[1]}</strong><small>live runtime state</small></div>)}</div><div className="section grid2"><Panel title="Global Workspace"><Json data={s.global_workspace_v2||s.workspace}/></Panel><Panel title="Self Model"><Json data={s.self_model_v2||s.self}/></Panel></div><div className="section grid3"><Panel title="Metacognition"><Json data={s.metacognition}/></Panel><Panel title="World Model"><Json data={s.world_model}/></Panel><Panel title="Learning"><Json data={s.learning_v2}/></Panel></div><div className="section card"><div className="title"><h2>Quick Actions</h2></div><div className="actions">{['Chat Workspace','Cognitive Loop','Memory','Goals','Autobiographical','Settings'].map(x=><button className="btn" onClick={()=>go(x)} key={x}>{x}<ChevronRight size={13}/></button>)}</div></div></>}
-function Chat({chat,msg,setMsg,send,busy}:Any){return <section className="card chat"><div className="title"><h2>Local Cognitive Chat</h2><span className="pill">approval-gated</span></div><div className="messages">{!chat.length&&<div className="empty">Start a conversation. Responses use the configured local model or deterministic fallback.</div>}{chat.map((x:Any,i:number)=><div className={'bubble '+x.role} key={i}><b>{x.role==='user'?'YOU':'CORE'}</b><br/>{x.text}</div>)}</div><div className="composer"><input value={msg} onChange={e=>setMsg(e.target.value)} onKeyDown={e=>e.key==='Enter'&&send()} placeholder="Message ConsciousCore…"/><button className="btn primary" onClick={send} disabled={busy}>{busy?<RefreshCw className="spin" size={17}/>:<Send size={17}/>}</button></div></section>}
-function Memory(){const[items,setItems]=useState<Any[]>([]),[q,setQ]=useState(''),[text,setText]=useState('');const load=()=>api('/api/memory?q='+encodeURIComponent(q)+'&limit=100').then(d=>setItems(d.items||[])).catch(()=>{});useEffect(()=>{load()},[]);const add=async()=>{if(!text.trim())return;await api('/api/memory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:text,kind:'semantic',importance:.6,confidence:.8,tags:[],source:'user'})});setText('');load()};const del=async(id:number)=>{await api('/api/memory/'+id,{method:'DELETE'});load()};return <><div className="card form"><div className="title"><h2>Persistent Memory</h2><span>{items.length} records</span></div><div className="actions"><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search memory…"/><button className="btn" onClick={load}><Search size={15}/></button></div><textarea value={text} onChange={e=>setText(e.target.value)} placeholder="Add a semantic, episodic or procedural memory…"/><button className="btn primary" onClick={add}><Plus size={15}/> Add Memory</button></div><div className="section list">{items.map(m=><div className="row" key={m.id}><div className="rowTop"><b>#{m.id} · {m.kind}</b><span className="tag">{Math.round(m.confidence*100)}% confidence</span></div><p>{m.content}</p><small className="muted">importance {Math.round(m.importance*100)}% · {m.source}</small><button className="btn" onClick={()=>del(m.id)}><Archive size={13}/> Delete</button></div>)}</div></>}
-function Goals(){const[items,setItems]=useState<Any[]>([]),[title,setTitle]=useState('');const load=()=>api('/api/goals').then(d=>setItems(d.items||[]));useEffect(()=>{load()},[]);const add=async()=>{if(!title.trim())return;await api('/api/goals',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,priority:.5})});setTitle('');load()};const upd=async(g:Any,status:string)=>{await api('/api/goals/'+g.id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});load()};return <><div className="card form"><div className="title"><h2>Goal Center</h2><span>{items.length} goals</span></div><div className="actions"><input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Desired outcome…"/><button className="btn primary" onClick={add}><Plus size={15}/> Create</button></div></div><div className="section list">{items.map(g=><div className="row" key={g.id}><div className="rowTop"><b>{g.title}</b><span className="tag">{g.status}</span></div><div className="bar"><i style={{width:(g.progress*100)+'%'}}/></div><small className="muted">{Math.round(g.progress*100)}% · priority {Math.round(g.priority*100)}%</small><div className="actions"><button className="btn" onClick={()=>upd(g,g.status==='paused'?'active':'paused')}>{g.status==='paused'?<Play size={13}/>:<Pause size={13}/>} {g.status==='paused'?'Resume':'Pause'}</button><button className="btn" onClick={()=>upd(g,'completed')}><CheckCircle2 size={13}/> Complete</button></div></div>)}</div></>}
-function Autobiographical(){const[data,setData]=useState<Any>({stats:{},recent:[]}),[q,setQ]=useState('');const load=()=>api(q?'/api/autobiographical/v2/search?q='+encodeURIComponent(q):'/api/autobiographical/v2').then(setData).catch(()=>{});useEffect(()=>{load()},[]);const items=data.items||data.recent||[];return <><div className="grid"><div className="card metric"><span>Total Episodes</span><strong>{data.stats?.total??items.length}</strong></div><div className="card metric"><span>Active</span><strong>{data.stats?.active??0}</strong></div><div className="card metric"><span>Archived</span><strong>{data.stats?.archived??0}</strong></div><div className="card metric"><span>Avg Importance</span><strong>{Math.round((data.stats?.average_importance??0)*100)}%</strong></div></div><div className="section card"><div className="actions"><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search autobiographical timeline…"/><button className="btn" onClick={load}><Search size={15}/> Search</button></div></div><div className="section timeline">{items.map((e:Any)=><div className="event" key={e.id}><div className="row"><div className="rowTop"><b>#{e.id} · {e.title}</b><span className="tag">cycle {e.cycle_id??'—'}</span></div><p>{e.summary}</p><small className="muted">{e.started_at} · confidence {Math.round(e.confidence*100)}% · importance {Math.round(e.importance*100)}%</small></div></div>)}{!items.length&&<div className="empty">No episodes yet. Run a cognitive cycle first.</div>}</div><div className="section notice">Autobiographical memory is a persistent computational history of cycles and linked context. It does not establish subjective experience or consciousness.</div></>}
-function Events(){const[data,setData]=useState<Any>({items:[],stats:{}});const load=()=>api('/api/events/v2/timeline?limit=200').then(setData).catch(()=>{});useEffect(()=>{load()},[]);return <><div className="grid"><div className="card metric"><span>Total Events</span><strong>{data.stats?.total??'—'}</strong></div><div className="card metric"><span>Types</span><strong>{data.stats?.event_types??'—'}</strong></div><div className="card metric"><span>Cycles</span><strong>{data.stats?.cycles??'—'}</strong></div><div className="card metric"><span>Live</span><strong>WS</strong></div></div><div className="section timeline">{(data.items||[]).map((e:Any,i:number)=><div className="event" key={e.id||i}><div className="row"><div className="rowTop"><b>{e.event_type||e.type}</b><span className="tag">{e.phase||'system'}</span></div><small className="muted">{e.timestamp} · cycle {e.cycle_id??'—'} · {e.source||'runtime'}</small><details><summary>payload</summary><pre className="json">{JSON.stringify(e.payload||{},null,2)}</pre></details></div></div>)}</div></>}
-function Loop(){const[s,setS]=useState<Any>({}),[msg,setMsg]=useState('');const load=()=>api('/api/loop').then(setS);useEffect(()=>{load();const t=setInterval(load,1000);return()=>clearInterval(t)},[]);const run=async()=>{if(!msg.trim())return;await api('/api/loop/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg})});setMsg('');load()};return <><div className="grid"><div className="card metric"><span>Cycle</span><strong>#{s.cycle_id??0}</strong></div><div className="card metric"><span>Phase</span><strong>{s.phase||'idle'}</strong></div><div className="card metric"><span>Status</span><strong>{s.status||'idle'}</strong></div><div className="card metric"><span>Phases</span><strong>{s.completed_phases?.length??0}</strong></div></div><div className="section card form"><textarea value={msg} onChange={e=>setMsg(e.target.value)} placeholder="Run a bounded cognitive cycle…"/><button className="btn primary" onClick={run}><Zap size={15}/> Run Cycle</button><Json data={s}/></div></>}
-function Generic({page,s,reload}:Any){const keyMap:Any={'World Model':'world_model','Global Workspace':'global_workspace_v2','Learning':'learning_v2','Self Model':'self_model_v2','Internal State':'state','Safety':'safety','Models':'models','Sleep':'sleep','Tools':'tools','Planner':'plans','Audit':'audit'};const key=keyMap[page];const[local,setLocal]=useState<Any>(null);useEffect(()=>{if(page==='Audit')api('/api/audit?limit=100').then(setLocal).catch(()=>{});else if(page==='Planner')api('/api/plans?limit=100').then(setLocal).catch(()=>{});},[page]);return <><div className="card"><div className="title"><h2>{page}</h2><button className="btn" onClick={reload}><RefreshCw size={14}/> Refresh</button></div><Json data={local||s[key]||{}}/></div><div className="section notice">{page==='Safety'?'Safety policy: prohibited actions include authentication bypass, secret extraction, MFA/CAPTCHA bypass and destructive system changes. External actions remain approval-gated.':page==='Models'?'Models are local. GGUF discovery and activation depend on installed files and optional llama-cpp-python support.':page==='Tools'?'Tool registration is declarative; actual external execution is not silently performed.':'This panel exposes the current computational runtime state and controls available through the backend.'}</div></>}
-function SettingsPanel({s,reload}:Any){return <><div className="grid3"><div className="card"><div className="title"><h2>Runtime</h2></div><div className="kv"><span>Local only</span><b>{String(s?.safety?.external_actions_require_approval!==false)}</b></div><div className="kv"><span>Autonomy</span><b>{s.safety?.autonomy_level??1}</b></div><div className="kv"><span>Model</span><b>{s.model?.name||'Fallback'}</b></div></div><div className="card"><div className="title"><h2>Architecture</h2></div><div className="kv"><span>Global workspace</span><b>enabled</b></div><div className="kv"><span>Reflection</span><b>enabled</b></div><div className="kv"><span>Prediction</span><b>heuristic</b></div></div><div className="card"><div className="title"><h2>Scientific Boundary</h2></div><p className="muted">Computational self-models, internal states, memory and global-workspace coordination are engineering constructs. They are not evidence of subjective consciousness, sentience, feelings or qualia.</p></div></div><div className="section card"><div className="title"><h2>Configuration Snapshot</h2><button className="btn" onClick={reload}><RefreshCw size={14}/> Reload</button></div><Json data={s}/></div></>}
-function Panel({title,children}:Any){return <div className="card"><div className="title"><h2>{title}</h2></div>{children}</div>};function Json({data}:Any){return <pre className="json">{JSON.stringify(data??{},null,2)}</pre>}
-createRoot(document.getElementById('root')!).render(<App/>);
+import React, { useState, useEffect } from 'react';
+import { createRoot } from 'react-dom/client';
+import './app-v3.css';
+
+import { AppState } from './types';
+import { Sidebar } from './Sidebar';
+import { Header } from './Header';
+import { CommandPalette } from './CommandPalette';
+
+import { DashboardPage } from './pages/DashboardPage';
+import { ChatPage } from './pages/ChatPage';
+import { GlobalWorkspacePage } from './pages/GlobalWorkspacePage';
+import { AttentionCenterPage } from './pages/AttentionCenterPage';
+import { MemoryCenterPage } from './pages/MemoryCenterPage';
+import { MemoryFederationPage } from './pages/MemoryFederationPage';
+import { SelfModelPage } from './pages/SelfModelPage';
+import { WorldModelPage } from './pages/WorldModelPage';
+import { GoalsPage } from './pages/GoalsPage';
+import { PlannerPage } from './pages/PlannerPage';
+import { ReasoningPage } from './pages/ReasoningPage';
+import { ReflectionPage } from './pages/ReflectionPage';
+import { MetacognitionPage } from './pages/MetacognitionPage';
+import { PredictionPage } from './pages/PredictionPage';
+import { SimulationPage } from './pages/SimulationPage';
+import { InternalStatePage } from './pages/InternalStatePage';
+import { SleepPage } from './pages/SleepPage';
+import { ToolCenterPage } from './pages/ToolCenterPage';
+import { SafetyCenterPage } from './pages/SafetyCenterPage';
+import { RuntimeCenterPage } from './pages/RuntimeCenterPage';
+import { ModelsPage } from './pages/ModelsPage';
+import { ParallelAIPage } from './pages/ParallelAIPage';
+import { DistributedNodesPage } from './pages/DistributedNodesPage';
+import { TelemetryPage } from './pages/TelemetryPage';
+import { AnalyticsPage } from './pages/AnalyticsPage';
+import { LogsPage } from './pages/LogsPage';
+import { DeveloperConsolePage } from './pages/DeveloperConsolePage';
+import { SettingsPage } from './pages/SettingsPage';
+
+const API = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+
+function App() {
+  const [page, setPage] = useState('Dashboard');
+  const [state, setState] = useState<AppState>({});
+  const [cmdOpen, setCmdOpen] = useState(false);
+
+  const loadState = async () => {
+    try {
+      const res = await fetch(`${API}/api/state`);
+      if (res.ok) {
+        const data = await res.json();
+        setState(data);
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    loadState();
+    const timer = setInterval(loadState, 5000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    (window as any).__cc_toggle_cmd = () => setCmdOpen(prev => !prev);
+  }, []);
+
+  const renderPage = () => {
+    switch (page) {
+      case 'Dashboard':
+        return <DashboardPage state={state} onNavigate={setPage} />;
+      case 'Chat Workspace':
+        return <ChatPage state={state} onRefresh={loadState} />;
+      case 'Global Workspace':
+        return <GlobalWorkspacePage state={state} onRefresh={loadState} />;
+      case 'Attention Center':
+        return <AttentionCenterPage state={state} onRefresh={loadState} />;
+      case 'Memory':
+        return <MemoryCenterPage state={state} onRefresh={loadState} />;
+      case 'Memory Federation':
+        return <MemoryFederationPage state={state} onRefresh={loadState} />;
+      case 'Self Model':
+        return <SelfModelPage state={state} onRefresh={loadState} />;
+      case 'World Model':
+        return <WorldModelPage state={state} onRefresh={loadState} />;
+      case 'Goals':
+        return <GoalsPage state={state} onRefresh={loadState} />;
+      case 'Planner':
+        return <PlannerPage state={state} onRefresh={loadState} />;
+      case 'Reasoning':
+        return <ReasoningPage state={state} />;
+      case 'Reflection':
+        return <ReflectionPage state={state} onRefresh={loadState} />;
+      case 'Metacognition':
+        return <MetacognitionPage state={state} />;
+      case 'Prediction':
+        return <PredictionPage state={state} />;
+      case 'Simulation':
+        return <SimulationPage state={state} />;
+      case 'Internal State':
+        return <InternalStatePage state={state} />;
+      case 'Sleep':
+        return <SleepPage state={state} onRefresh={loadState} />;
+      case 'Tools':
+        return <ToolCenterPage state={state} onRefresh={loadState} />;
+      case 'Safety':
+        return <SafetyCenterPage state={state} onRefresh={loadState} />;
+      case 'Runtime Center':
+        return <RuntimeCenterPage state={state} onRefresh={loadState} />;
+      case 'Models':
+        return <ModelsPage state={state} onRefresh={loadState} />;
+      case 'Parallel AI':
+        return <ParallelAIPage state={state} />;
+      case 'Distributed Nodes':
+        return <DistributedNodesPage state={state} />;
+      case 'Telemetry':
+        return <TelemetryPage state={state} />;
+      case 'Analytics':
+        return <AnalyticsPage state={state} />;
+      case 'Logs':
+        return <LogsPage state={state} />;
+      case 'Developer Console':
+        return <DeveloperConsolePage state={state} onRefresh={loadState} />;
+      case 'Settings':
+        return <SettingsPage state={state} onRefresh={loadState} />;
+      default:
+        return <DashboardPage state={state} onNavigate={setPage} />;
+    }
+  };
+
+  return (
+    <div className="cc">
+      <Sidebar
+        currentPage={page}
+        onNavigate={setPage}
+        autonomyLevel={state.safety?.autonomy_level}
+      />
+      <main className="main">
+        <Header
+          currentPage={page}
+          state={state}
+          onOpenCommandPalette={() => setCmdOpen(true)}
+          onRefresh={loadState}
+        />
+        {renderPage()}
+      </main>
+
+      <CommandPalette
+        isOpen={cmdOpen}
+        onClose={() => setCmdOpen(false)}
+        onNavigate={setPage}
+      />
+    </div>
+  );
+}
+
+createRoot(document.getElementById('root')!).render(<App />);

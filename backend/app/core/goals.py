@@ -281,7 +281,9 @@ class GoalManager:
         if progress is not None:
             updates.append("progress=?")
             params.append(p)
-        if status is not None:
+            updates.append("status=?")
+            params.append(s)
+        elif status is not None:
             updates.append("status=?")
             params.append(s)
         if priority is not None:

@@ -27,7 +27,14 @@ class RuntimeOrchestrator:
         else:
             result = await self.executor.generate(request, context)
         self.last_result = result
-        self.telemetry.record("generation", result.latency_ms, result.provider)
+        self.telemetry.record_request(
+            request_id=f"req_{id(result)}",
+            runtime_mode=result.mode,
+            provider=result.provider,
+            model=result.model,
+            latency_ms=result.latency_ms,
+            success=not result.degraded
+        )
         return result
 
     async def _hybrid(self, request: RuntimeRequest, context: list[str] | None) -> RuntimeResult:
