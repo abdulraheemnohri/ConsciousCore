@@ -11,6 +11,9 @@ from .core.learning_engine import LearningEngine
 from .core.ai_network import AINetworkBus
 from .core.code_lab import CodeLab
 from .core.diagnostics import DiagnosticsEngine
+from .core.contradiction_engine import ContradictionEngine
+from native.rules.rule_engine import NativeRuleEngine
+from native.intent.intent_engine import NativeIntentEngine
 from .database import db
 
 VERSION = "1.0.0"
@@ -24,6 +27,9 @@ skills_engine = SkillsEngine()
 learning_engine = LearningEngine()
 ai_network_bus = AINetworkBus()
 code_lab = CodeLab()
+rule_engine = NativeRuleEngine()
+intent_engine = NativeIntentEngine()
+contradiction_engine = ContradictionEngine()
 
 class Chat(BaseModel): message: str = Field(min_length=1, max_length=20000)
 class StateTransition(BaseModel): uncertainty: float | None = Field(default=None, ge=0, le=1); energy_delta: float = Field(default=0, ge=-1, le=1); valence_delta: float = Field(default=0, ge=-1, le=1)
@@ -54,6 +60,8 @@ class ModelActivate(BaseModel): model_id: str = Field(min_length=1, max_length=2
 class SkillInput(BaseModel): name: str; category: str = "learned"; procedure: str = ""
 class AISessionInput(BaseModel): topic: str; participants: list[str] = ["Researcher", "Architect", "Critic"]
 class CodeProposalInput(BaseModel): title: str; author: str; target_file: str; diff_content: str
+class IntentQuery(BaseModel): query: str
+class ResolveContradiction(BaseModel): fact_a: dict; fact_b: dict
 
 def audit(event_type, payload):
     db.execute("INSERT INTO audit_logs(event_type,payload,created_at) VALUES(?,?,?)", (event_type, json.dumps(payload), datetime.now(timezone.utc).isoformat()))
@@ -66,6 +74,24 @@ async def state(): return engine.snapshot()
 
 @app.post("/api/chat")
 async def chat(body: Chat): return await engine.process(body.message)
+
+@app.get("/api/v1/config/{config_name}")
+async def get_config(config_name: str):
+    path = os.path.join("config", f"{config_name}.json")
+    if not os.path.exists(path): raise HTTPException(404, "config_not_found")
+    with open(path) as f: return json.load(f)
+
+@app.post("/api/v1/intent")
+async def detect_intent(body: IntentQuery):
+    return intent_engine.detect_intent(body.query)
+
+@app.post("/api/v1/rules/evaluate")
+async def evaluate_rules(state: dict):
+    return {"triggered_actions": rule_engine.evaluate(state)}
+
+@app.post("/api/v1/knowledge/contradictions/resolve")
+async def resolve_contradiction(body: ResolveContradiction):
+    return contradiction_engine.detect_and_resolve(body.fact_a, body.fact_b)
 
 @app.get("/api/v1/diagnostics/check-myself")
 async def check_myself():

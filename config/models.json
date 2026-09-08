@@ -1,0 +1,7 @@
+{
+  "default_model": "llama-3-8b-instruct.Q4_K_M.gguf",
+  "fallback_model": "native_core",
+  "context_size": 4096,
+  "temperature": 0.2,
+  "n_gpu_layers": 0
+}

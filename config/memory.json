@@ -1,0 +1,7 @@
+{
+  "retention_days": 365,
+  "auto_summarization": true,
+  "max_working_memory_items": 50,
+  "deduplication_enabled": true,
+  "encryption_enabled": true
+}

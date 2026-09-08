@@ -1,0 +1,6 @@
+{
+  "node_id": "node_local_primary",
+  "sync_enabled": true,
+  "conflict_strategy": "PROVENANCE_TIMESTAMP",
+  "trusted_nodes": ["node_local_primary"]
+}

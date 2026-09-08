@@ -1,0 +1,7 @@
+{
+  "reasoning_mode": "NATIVE_FIRST",
+  "confidence_threshold": 0.7,
+  "uncertainty_threshold": 0.3,
+  "context_limit": 8192,
+  "attention_window": 10
+}
