@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Shield, Cpu, Database, Activity, RefreshCw } from 'lucide-react';
+import { Search, Shield, Cpu, Database, Activity, RefreshCw, AlertOctagon } from 'lucide-react';
 import { AppState } from './types';
 
 interface HeaderProps {
@@ -13,6 +13,17 @@ export function Header({ currentPage, state, onOpenCommandPalette, onRefresh }: 
   const modelName = state.model?.name || state.model?.model_id || 'Deterministic Fallback';
   const memoryCount = state.memory_count ?? 0;
   const autonomyLevel = state.safety?.autonomy_level ?? 1;
+
+  const handleEmergencyStop = async () => {
+    try {
+      const API = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+      await fetch(`${API}/api/v1/emergency-stop`, { method: 'POST' });
+      alert("EMERGENCY STOP TRIGGERED: All autonomous activity halted.");
+      onRefresh();
+    } catch (err) {
+      alert("Failed to trigger emergency stop.");
+    }
+  };
 
   return (
     <header className="head">
@@ -54,6 +65,14 @@ export function Header({ currentPage, state, onOpenCommandPalette, onRefresh }: 
 
         <button className="btn refresh-btn" onClick={onRefresh} title="Refresh System State">
           <RefreshCw size={14} />
+        </button>
+
+        <button
+          className="px-2.5 py-1.5 bg-red-600/80 hover:bg-red-600 text-white font-semibold text-xs rounded-lg flex items-center gap-1 shadow transition-colors"
+          onClick={handleEmergencyStop}
+          title="STOP ALL AUTONOMOUS ACTIVITY"
+        >
+          <AlertOctagon size={13} /> STOP
         </button>
       </div>
     </header>

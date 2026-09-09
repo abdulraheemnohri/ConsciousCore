@@ -1,0 +1,8 @@
+{
+  "app_name": "ConsciousCore",
+  "version": "1.0.0",
+  "mode": "HYBRID",
+  "environment": "local_first",
+  "data_dir": "./data",
+  "port": 8000
+}

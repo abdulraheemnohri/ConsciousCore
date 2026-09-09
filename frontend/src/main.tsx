@@ -7,14 +7,23 @@ import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { CommandPalette } from './CommandPalette';
 
+import { OnboardingPage } from './pages/OnboardingPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ChatPage } from './pages/ChatPage';
 import { GlobalWorkspacePage } from './pages/GlobalWorkspacePage';
 import { AttentionCenterPage } from './pages/AttentionCenterPage';
+import { KnowledgePage } from './pages/KnowledgePage';
+import { SkillsPage } from './pages/SkillsPage';
+import { LearningPage } from './pages/LearningPage';
 import { MemoryCenterPage } from './pages/MemoryCenterPage';
 import { MemoryFederationPage } from './pages/MemoryFederationPage';
 import { SelfModelPage } from './pages/SelfModelPage';
 import { WorldModelPage } from './pages/WorldModelPage';
+import { AINetworkPage } from './pages/AINetworkPage';
+import { AIConversationsPage } from './pages/AIConversationsPage';
+import { AgentsPage } from './pages/AgentsPage';
+import { ExperimentsPage } from './pages/ExperimentsPage';
+import { CodeLabPage } from './pages/CodeLabPage';
 import { GoalsPage } from './pages/GoalsPage';
 import { PlannerPage } from './pages/PlannerPage';
 import { ReasoningPage } from './pages/ReasoningPage';
@@ -26,6 +35,9 @@ import { InternalStatePage } from './pages/InternalStatePage';
 import { SleepPage } from './pages/SleepPage';
 import { ToolCenterPage } from './pages/ToolCenterPage';
 import { SafetyCenterPage } from './pages/SafetyCenterPage';
+import { SecurityPage } from './pages/SecurityPage';
+import { SystemPage } from './pages/SystemPage';
+import { ActivityPage } from './pages/ActivityPage';
 import { RuntimeCenterPage } from './pages/RuntimeCenterPage';
 import { ModelsPage } from './pages/ModelsPage';
 import { ParallelAIPage } from './pages/ParallelAIPage';
@@ -65,6 +77,8 @@ function App() {
 
   const renderPage = () => {
     switch (page) {
+      case 'Onboarding':
+        return <OnboardingPage />;
       case 'Dashboard':
         return <DashboardPage state={state} onNavigate={setPage} />;
       case 'Chat Workspace':
@@ -73,6 +87,12 @@ function App() {
         return <GlobalWorkspacePage state={state} onRefresh={loadState} />;
       case 'Attention Center':
         return <AttentionCenterPage state={state} onRefresh={loadState} />;
+      case 'Knowledge':
+        return <KnowledgePage />;
+      case 'Skills':
+        return <SkillsPage />;
+      case 'Learning':
+        return <LearningPage />;
       case 'Memory':
         return <MemoryCenterPage state={state} onRefresh={loadState} />;
       case 'Memory Federation':
@@ -81,6 +101,16 @@ function App() {
         return <SelfModelPage state={state} onRefresh={loadState} />;
       case 'World Model':
         return <WorldModelPage state={state} onRefresh={loadState} />;
+      case 'AI Network':
+        return <AINetworkPage />;
+      case 'AI Conversations':
+        return <AIConversationsPage />;
+      case 'Agents':
+        return <AgentsPage />;
+      case 'Experiments':
+        return <ExperimentsPage />;
+      case 'Code Lab':
+        return <CodeLabPage />;
       case 'Goals':
         return <GoalsPage state={state} onRefresh={loadState} />;
       case 'Planner':
@@ -103,6 +133,12 @@ function App() {
         return <ToolCenterPage state={state} onRefresh={loadState} />;
       case 'Safety':
         return <SafetyCenterPage state={state} onRefresh={loadState} />;
+      case 'Security':
+        return <SecurityPage />;
+      case 'System':
+        return <SystemPage />;
+      case 'Activity':
+        return <ActivityPage />;
       case 'Runtime Center':
         return <RuntimeCenterPage state={state} onRefresh={loadState} />;
       case 'Models':

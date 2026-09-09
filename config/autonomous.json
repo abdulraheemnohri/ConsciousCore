@@ -1,0 +1,9 @@
+{
+  "autonomous_work_enabled": true,
+  "idle_detection_seconds": 30,
+  "cpu_limit_percent": 80,
+  "ram_limit_percent": 85,
+  "gpu_limit_percent": 80,
+  "battery_limit_percent": 20,
+  "temperature_limit_celsius": 80
+}

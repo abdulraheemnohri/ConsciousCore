@@ -1,0 +1,5 @@
+{
+  "default_role": "user",
+  "tools_permission": "READ_WRITE",
+  "high_risk_requires_approval": true
+}

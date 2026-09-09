@@ -1,0 +1,7 @@
+{
+  "local_only": true,
+  "allow_remote_ai": false,
+  "redact_secrets": true,
+  "telemetry_enabled": false,
+  "emergency_lockdown": false
+}

@@ -1,0 +1,8 @@
+{
+  "learning_enabled": true,
+  "auto_learn": true,
+  "ai_assisted_learning": true,
+  "skill_discovery": true,
+  "idle_learning": true,
+  "approval_threshold": 0.85
+}

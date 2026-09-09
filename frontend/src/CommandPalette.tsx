@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Brain, Database, Shield, Sliders, Target, Workflow, Network, Layers, Activity, MessageSquare, Zap, BookOpen, UserRound, Clock3, Box, Settings, History, HelpCircle, Server, Radio, Cpu, LineChart, AlertTriangle } from 'lucide-react';
+import { Search, Brain, Database, Shield, Sliders, Target, Workflow, Network, Layers, Activity, MessageSquare, Zap, BookOpen, UserRound, Clock3, Box, Settings, History, HelpCircle, Server, Radio, Cpu, LineChart, AlertTriangle, Compass, Sparkles, Code, Users, Terminal } from 'lucide-react';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -12,10 +12,19 @@ export const commands = [
   { name: 'Chat Workspace', page: 'Chat Workspace', icon: MessageSquare, category: 'Main' },
   { name: 'Global Workspace', page: 'Global Workspace', icon: Brain, category: 'Cognition' },
   { name: 'Attention Center', page: 'Attention Center', icon: Zap, category: 'Cognition' },
+  { name: 'Onboarding', page: 'Onboarding', icon: Compass, category: 'Main' },
+  { name: 'Knowledge Engine', page: 'Knowledge', icon: BookOpen, category: 'Cognition' },
+  { name: 'Self Skills', page: 'Skills', icon: Zap, category: 'Cognition' },
+  { name: 'Self Learning Engine', page: 'Learning', icon: Sparkles, category: 'Cognition' },
   { name: 'Memory Center', page: 'Memory', icon: Database, category: 'Memory' },
   { name: 'Memory Federation', page: 'Memory Federation', icon: Network, category: 'Memory' },
   { name: 'Self Model', page: 'Self Model', icon: UserRound, category: 'Cognition' },
   { name: 'World Model', page: 'World Model', icon: Network, category: 'Cognition' },
+  { name: 'AI Network & Communication', page: 'AI Network', icon: Network, category: 'AI Network' },
+  { name: 'AI Conversations & Debates', page: 'AI Conversations', icon: MessageSquare, category: 'AI Network' },
+  { name: 'Agent Roles', page: 'Agents', icon: Users, category: 'AI Network' },
+  { name: 'Experiment Lab', page: 'Experiments', icon: Box, category: 'AI Network' },
+  { name: 'Code Lab & Self-Building', page: 'Code Lab', icon: Code, category: 'AI Network' },
   { name: 'Goals', page: 'Goals', icon: Target, category: 'Planning' },
   { name: 'Planner', page: 'Planner', icon: Workflow, category: 'Planning' },
   { name: 'Reasoning Center', page: 'Reasoning', icon: Brain, category: 'Cognition' },
@@ -27,6 +36,9 @@ export const commands = [
   { name: 'Sleep / Consolidation', page: 'Sleep', icon: Clock3, category: 'Memory' },
   { name: 'Tool Center', page: 'Tools', icon: Box, category: 'System' },
   { name: 'Safety Center', page: 'Safety', icon: Shield, category: 'System' },
+  { name: 'Security Governor', page: 'Security', icon: Shield, category: 'System' },
+  { name: 'System Telemetry', page: 'System', icon: Terminal, category: 'System' },
+  { name: 'Unified Activity Timeline', page: 'Activity', icon: Clock3, category: 'System' },
   { name: 'Runtime Center', page: 'Runtime Center', icon: Cpu, category: 'Runtime' },
   { name: 'Model Manager', page: 'Models', icon: Sliders, category: 'Runtime' },
   { name: 'Parallel AI', page: 'Parallel AI', icon: Radio, category: 'Runtime' },

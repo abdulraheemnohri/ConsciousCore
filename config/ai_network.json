@@ -1,0 +1,8 @@
+{
+  "ai_to_ai_enabled": true,
+  "max_turns": 10,
+  "token_budget": 16000,
+  "runtime_limit_seconds": 300,
+  "loop_detection": true,
+  "allowed_roles": ["Researcher", "Architect", "Developer", "Critic", "Tester"]
+}
